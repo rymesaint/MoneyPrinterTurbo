@@ -155,6 +155,7 @@ def save_config():
         _cfg["ui"] = ui
         _cfg["discord"] = discord
         _cfg["youtube"] = youtube
+        _cfg["facebook"] = facebook
         f.write(toml.dumps(_cfg))
 
 
@@ -172,6 +173,7 @@ ui = _cfg.get(
 )
 discord = _cfg.get("discord", {})
 youtube = _cfg.get("youtube", {})
+facebook = _cfg.get("facebook", {})
 
 hostname = socket.gethostname()
 

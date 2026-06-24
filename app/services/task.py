@@ -567,6 +567,51 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
         except Exception as e:
             logger.error(f"Failed to execute YouTube upload: {e}")
 
+    # 9. Upload to Facebook Reels (if enabled)
+    facebook_results = []
+    if config.facebook.get("enabled", False) and config.facebook.get("auto_upload", False):
+        logger.info("\n\n## uploading videos to Facebook Reels")
+        try:
+            from app.services.facebook import facebook_service
+            
+            # Generate social metadata for Facebook Reels
+            try:
+                metadata = llm.generate_social_metadata(
+                    video_subject=params.video_subject,
+                    video_script=video_script,
+                    language=params.video_language,
+                    platform="facebook_reels"
+                )
+                fb_caption = metadata.get("caption") or video_script or ""
+                title_part = metadata.get("title", "")
+                hash_part = " ".join(metadata.get("hashtags", []))
+                
+                parts = []
+                if title_part:
+                    parts.append(title_part)
+                if fb_caption:
+                    parts.append(fb_caption)
+                if hash_part:
+                    parts.append(hash_part)
+                
+                fb_desc = "\n\n".join(parts)
+            except Exception as ex:
+                logger.warning(f"Failed to generate Facebook social metadata: {ex}")
+                fb_desc = f"{params.video_subject}\n\n{video_script}\n\n#reels #viral #shorts"
+
+            for video_path in final_video_paths:
+                result = facebook_service.upload_reel(
+                    video_path=video_path,
+                    caption=fb_desc
+                )
+                facebook_results.append(result)
+                if result.get('success'):
+                    logger.info(f"✅ Uploaded to Facebook: {video_path}")
+                else:
+                    logger.warning(f"⚠️ Failed to upload to Facebook: {video_path} - {result.get('error', 'Unknown error')}")
+        except Exception as e:
+            logger.error(f"Failed to execute Facebook upload: {e}")
+
     kwargs = {
         "videos": final_video_paths,
         "combined_videos": combined_video_paths,
@@ -578,6 +623,7 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
         "materials": downloaded_videos,
         "cross_post_results": cross_post_results if cross_post_results else None,
         "youtube_results": youtube_results if youtube_results else None,
+        "facebook_results": facebook_results if facebook_results else None,
     }
     sm.state.update_task(
         task_id, state=const.TASK_STATE_COMPLETE, progress=100, **kwargs

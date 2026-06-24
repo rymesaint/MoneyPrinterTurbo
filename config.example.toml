@@ -418,3 +418,16 @@ bot_token = ""
 # Channel ID where the bot listens to and reports video generation progress
 channel_id = ""
 
+[facebook]
+# Enable/disable Facebook Reels integration
+enabled = false
+# Automatically upload generated videos to Facebook Reels
+auto_upload = false
+# The Page ID of your Facebook Page
+page_id = ""
+# The Page Access Token (non-expiring System User Token is recommended)
+access_token = ""
+# Facebook Graph API Version
+api_version = "v20.0"
+
+
