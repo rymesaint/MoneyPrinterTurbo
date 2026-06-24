@@ -312,6 +312,21 @@ def generate_final_videos(
 
 
 def start(task_id, params: VideoParams, stop_at: str = "video"):
+    import threading
+    current_thread_id = threading.get_ident()
+    log_file = path.join(utils.task_dir(task_id), "task.log")
+    handler_id = logger.add(
+        log_file,
+        filter=lambda record: record["thread"].id == current_thread_id,
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
+        level="DEBUG"
+    )
+    try:
+        return _start_inner(task_id, params, stop_at)
+    finally:
+        logger.remove(handler_id)
+
+def _start_inner(task_id, params: VideoParams, stop_at: str = "video"):
     logger.info(f"start task: {task_id}, stop_at: {stop_at}")
     sm.state.update_task(task_id, state=const.TASK_STATE_PROCESSING, progress=5)
 

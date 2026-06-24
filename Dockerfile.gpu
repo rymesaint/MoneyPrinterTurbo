@@ -49,7 +49,8 @@ RUN python3 -m pip install --no-cache-dir \
 COPY . .
 
 # Expose the port the app runs on
-EXPOSE 8501
+EXPOSE 8080
 
 # Command to run the application
-CMD ["streamlit", "run", "./webui/Main.py","--browser.serverAddress=127.0.0.1","--server.enableCORS=True","--browser.gatherUsageStats=False","--server.showEmailPrompt=False"]
+CMD ["python3", "main.py"]
+

@@ -21,7 +21,7 @@ class _FakeRedis:
                 b"progress": str(index).encode("utf-8"),
             }
 
-    def scan(self, cursor, count):
+    def scan(self, cursor, count, match=None):
         batch_index = int(cursor)
         next_cursor = batch_index + 1
         if next_cursor >= len(self.batches):

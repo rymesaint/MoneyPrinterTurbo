@@ -1,73 +1,47 @@
-import ast
-import json
+import ast, json, unittest
 from pathlib import Path
-import unittest
-
 
 ROOT_DIR = Path(__file__).parent.parent.parent
-WEBUI_MAIN = ROOT_DIR / "webui" / "Main.py"
-I18N_DIR = ROOT_DIR / "webui" / "i18n"
+WEBUI_I18N_DIR = ROOT_DIR / "webui" / "public" / "i18n"
 
 
-class _TrKeyVisitor(ast.NodeVisitor):
-    def __init__(self):
-        self.keys = set()
-
-    def visit_Call(self, node):
-        if (
-            isinstance(node.func, ast.Name)
-            and node.func.id == "tr"
-            and node.args
-            and isinstance(node.args[0], ast.Constant)
-            and isinstance(node.args[0].value, str)
-        ):
-            self.keys.add(node.args[0].value)
-        self.generic_visit(node)
+def _load_translation(locale: str) -> dict:
+    return json.loads((WEBUI_I18N_DIR / f"{locale}.json").read_text(encoding="utf-8")).get("Translation", {})
 
 
-def _load_translation(locale):
-    data = json.loads((I18N_DIR / f"{locale}.json").read_text(encoding="utf-8"))
-    return data.get("Translation", {})
+def _get_referenced_locales() -> list[str]:
+    """Read locales listed in Nuxt config."""
+    config_path = ROOT_DIR / "webui" / "nuxt.config.ts"
+    text = config_path.read_text(encoding="utf-8")
+    for line in text.splitlines():
+        if "locales:" in line and "[" in line:
+            start = line.index("[")
+            end = line.index("]", start) + 1
+            return ast.literal_eval(line[start:end])
+    return []
 
 
 class TestWebuiI18n(unittest.TestCase):
-    def test_english_locale_covers_static_webui_labels(self):
-        tree = ast.parse(WEBUI_MAIN.read_text(encoding="utf-8"))
-        visitor = _TrKeyVisitor()
-        visitor.visit(tree)
+    """Validate i18n JSON files against each other (all must match English keys)."""
 
+    def test_all_locales_have_same_keys_as_english(self):
         en_keys = set(_load_translation("en"))
-
-        self.assertEqual(sorted(visitor.keys - en_keys), [])
-
-    def test_russian_locale_covers_english_locale(self):
-        en_keys = set(_load_translation("en"))
-        ru_keys = set(_load_translation("ru"))
-
-        self.assertEqual(sorted(en_keys - ru_keys), [])
-
-    def test_russian_locale_covers_static_webui_labels(self):
-        tree = ast.parse(WEBUI_MAIN.read_text(encoding="utf-8"))
-        visitor = _TrKeyVisitor()
-        visitor.visit(tree)
-
-        ru_keys = set(_load_translation("ru"))
-
-        self.assertEqual(sorted(visitor.keys - ru_keys), [])
-
-    def test_script_language_options_include_russian(self):
-        tree = ast.parse(WEBUI_MAIN.read_text(encoding="utf-8"))
-        support_locales = None
-
-        for node in tree.body:
-            if not isinstance(node, ast.Assign):
+        for lang in sorted(WEBUI_I18N_DIR.glob("*.json")):
+            loc = lang.stem
+            if loc == "en":
                 continue
-            if any(
-                isinstance(target, ast.Name) and target.id == "support_locales"
-                for target in node.targets
-            ):
-                support_locales = ast.literal_eval(node.value)
-                break
+            loc_keys = set(_load_translation(loc))
+            missing = en_keys - loc_keys
+            self.assertEqual(
+                sorted(missing), [],
+                f"{loc} missing keys from English: {sorted(missing)}",
+            )
+            extra = loc_keys - en_keys
+            self.assertEqual(
+                sorted(extra), [],
+                f"{loc} has extra keys not in English: {sorted(extra)}",
+            )
 
-        self.assertIsNotNone(support_locales)
-        self.assertIn("ru-RU", support_locales)
+    def test_english_locale_has_keys(self):
+        en = _load_translation("en")
+        self.assertGreater(len(en), 100, "English locale has too few keys")

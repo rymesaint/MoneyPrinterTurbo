@@ -132,7 +132,7 @@ class RedisState(BaseState):
         cursor = 0
         total = 0
         while True:
-            cursor, keys = self._redis.scan(cursor, count=page_size)
+            cursor, keys = self._redis.scan(cursor, match="mpt_task:*", count=page_size)
             batch_start = total
             batch_size = len(keys)
             total += batch_size
@@ -144,12 +144,16 @@ class RedisState(BaseState):
                 slice_start = max(0, start - batch_start)
                 slice_end = min(batch_size, end - batch_start)
                 for key in keys[slice_start:slice_end]:
-                    task_data = self._redis.hgetall(key)
-                    task = {
-                        k.decode("utf-8"): self._convert_to_original_type(v)
-                        for k, v in task_data.items()
-                    }
-                    tasks.append(task)
+                    try:
+                        task_data = self._redis.hgetall(key)
+                        if task_data:
+                            task = {
+                                k.decode("utf-8", errors="replace"): self._convert_to_original_type(v)
+                                for k, v in task_data.items()
+                            }
+                            tasks.append(task)
+                    except Exception:
+                        pass
 
             # 即使当前页已经取满，也要继续 SCAN 到 cursor=0，
             # 因为调用方需要准确 total 来渲染分页信息。
@@ -176,21 +180,25 @@ class RedisState(BaseState):
         }
 
         for field, value in fields.items():
-            self._redis.hset(task_id, field, str(value))
+            self._redis.hset(f"mpt_task:{task_id}", field, str(value))
         trigger_task_notification(task_id, state, progress)
 
     def get_task(self, task_id: str):
-        task_data = self._redis.hgetall(task_id)
+        task_data = self._redis.hgetall(f"mpt_task:{task_id}")
+        if not task_data:
+            # Legacy fallback
+            task_data = self._redis.hgetall(task_id)
         if not task_data:
             return None
 
         task = {
-            key.decode("utf-8"): self._convert_to_original_type(value)
+            key.decode("utf-8", errors="replace"): self._convert_to_original_type(value)
             for key, value in task_data.items()
         }
         return task
 
     def delete_task(self, task_id: str):
+        self._redis.delete(f"mpt_task:{task_id}")
         self._redis.delete(task_id)
 
     @staticmethod
@@ -203,7 +211,10 @@ class RedisState(BaseState):
         should move to a strict JSON/schema parser instead of open-ended literal
         conversion.
         """
-        value_str = value.decode("utf-8")
+        try:
+            value_str = value.decode("utf-8")
+        except UnicodeDecodeError:
+            value_str = value.decode("utf-8", errors="replace")
 
         try:
             # try to convert byte string array to list
