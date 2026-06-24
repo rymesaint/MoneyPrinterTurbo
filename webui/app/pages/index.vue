@@ -127,6 +127,7 @@
                     <option value="pexels">Pexels</option>
                     <option value="pixabay">Pixabay</option>
                     <option value="coverr">Coverr</option>
+                    <option value="vecteezy">Vecteezy</option>
                     <option value="local">{{ tr('Local file') }}</option>
                   </select>
                 </div>
@@ -631,7 +632,7 @@
             <!-- Material Keys -->
             <div v-else-if="activeSettingsTab === 'materials'" class="settings-section-panel">
               <h2 class="settings-panel-title">{{ tr('Material Provider API Keys') }}</h2>
-              <p class="settings-panel-desc">{{ tr('API keys used to download video clips from Pexels, Pixabay, and Coverr.') }}</p>
+              <p class="settings-panel-desc">{{ tr('API keys used to download video clips from Pexels, Pixabay, Coverr, and Vecteezy.') }}</p>
               
               <div class="field">
                 <label class="field-label">{{ tr('Pexels API Keys') }} ({{ tr('comma-separated') }})</label>
@@ -646,6 +647,16 @@
               <div class="field">
                 <label class="field-label">{{ tr('Coverr API Keys') }} ({{ tr('comma-separated') }})</label>
                 <input v-model="coverrKeysString" type="text" class="control input" placeholder="key1, key2" />
+              </div>
+
+              <div class="field">
+                <label class="field-label">{{ tr('Vecteezy API Keys') }} ({{ tr('comma-separated') }})</label>
+                <input v-model="vecteezyKeysString" type="text" class="control input" placeholder="key1, key2" />
+              </div>
+
+              <div class="field">
+                <label class="field-label">{{ tr('Vecteezy Account ID') }}</label>
+                <input v-model="configData.app.vecteezy_account_id" type="text" class="control input" placeholder="123456" />
               </div>
             </div>
 
@@ -1642,6 +1653,13 @@ const coverrKeysString = computed({
   set: (val: string) => {
     if (!configData.value.app) configData.value.app = {}
     configData.value.app.coverr_api_keys = val.split(',').map((s: string) => s.trim()).filter(Boolean)
+  }
+})
+const vecteezyKeysString = computed({
+  get: () => Array.isArray(configData.value.app?.vecteezy_api_keys) ? configData.value.app.vecteezy_api_keys.join(', ') : '',
+  set: (val: string) => {
+    if (!configData.value.app) configData.value.app = {}
+    configData.value.app.vecteezy_api_keys = val.split(',').map((s: string) => s.trim()).filter(Boolean)
   }
 })
 const youtubeTagsString = computed({

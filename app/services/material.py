@@ -241,6 +241,117 @@ def search_videos_coverr(
     return []
 
 
+def search_videos_vecteezy(
+    search_term: str,
+    minimum_duration: int,
+    video_aspect: VideoAspect = VideoAspect.portrait,
+) -> List[MaterialInfo]:
+    """
+    Vecteezy (https://www.vecteezy.com) - stock video library,
+    subject to Vecteezy license terms (https://www.vecteezy.com/licensing).
+
+    API v2 docs: https://www.vecteezy.com/api-docs/index.html
+    - Search: GET /v2/{account_id}/resources?term=...&content_type=videos
+    - Download: GET /v2/{account_id}/resources/{id}/download -> {url: "..."}
+    - Auth: Bearer token
+
+    Vecteezy search doesn't return direct download URLs, so we
+    call the download endpoint per matched resource to resolve.
+
+    Config requires:
+      vecteezy_account_id = "<your_account_id>"
+      vecteezy_api_keys = ["<your_api_key>"]
+    """
+    aspect = VideoAspect(video_aspect)
+    video_width, video_height = aspect.to_resolution()
+
+    api_key = get_api_key("vecteezy_api_keys")
+    account_id = config.app.get("vecteezy_account_id", "")
+    if not account_id:
+        logger.error("vecteezy_account_id not set in config.toml [app] section")
+        return []
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+    }
+
+    params = {
+        "term": search_term,
+        "content_type": "videos",
+        "page": 1,
+        "per_page": 20,
+        "duration": f"{minimum_duration}_99999",
+        "sort_by": "relevant",
+    }
+    query_url = f"https://api.vecteezy.com/v2/{account_id}/resources?{urlencode(params)}"
+    logger.info(f"searching videos: {query_url}, with proxies: {config.proxy}")
+
+    try:
+        r = requests.get(
+            query_url,
+            headers=headers,
+            proxies=config.proxy,
+            verify=_get_tls_verify(),
+            timeout=(30, 60),
+        )
+        response = r.json()
+        video_items = []
+
+        if "resources" not in response:
+            logger.error(f"search videos failed: {response}")
+            return video_items
+
+        for resource in response["resources"]:
+            resource_id = resource.get("id")
+            if not resource_id:
+                continue
+
+            sizes = resource.get("available_download_sizes") or []
+            matched_size = None
+            for sz in sizes:
+                if (
+                    int(sz.get("width", 0)) == video_width
+                    and int(sz.get("height", 0)) == video_height
+                ):
+                    matched_size = sz.get("id", "")
+                    break
+
+            if not matched_size:
+                continue
+
+            try:
+                dl_resp = requests.get(
+                    f"https://api.vecteezy.com/v2/{account_id}/resources/{resource_id}/download",
+                    headers=headers,
+                    proxies=config.proxy,
+                    verify=_get_tls_verify(),
+                    timeout=(30, 60),
+                )
+                dl_data = dl_resp.json()
+                video_url = dl_data.get("url")
+                if not video_url:
+                    continue
+
+                item = MaterialInfo()
+                item.provider = "vecteezy"
+                item.url = video_url
+                item.duration = minimum_duration
+                video_items.append(item)
+            except Exception as e:
+                logger.warning(
+                    f"failed to get download URL for Vecteezy resource "
+                    f"{resource_id}: {str(e)}"
+                )
+                continue
+
+        return video_items
+    except Exception as e:
+        logger.error(f"search videos failed: {str(e)}")
+
+    return []
+
+
 def save_video(video_url: str, save_dir: str = "") -> str:
     if not save_dir:
         save_dir = utils.storage_dir("cache_videos")
@@ -316,6 +427,8 @@ def download_videos(
         search_videos = search_videos_pixabay
     elif source == "coverr":
         search_videos = search_videos_coverr
+    elif source == "vecteezy":
+        search_videos = search_videos_vecteezy
 
     material_directory = config.app.get("material_directory", "").strip()
     if material_directory == "task":
