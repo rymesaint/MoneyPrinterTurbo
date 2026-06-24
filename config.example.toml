@@ -405,6 +405,10 @@ privacy_status = "public"
 tags = ["shorts", "viral", "mpt"]
 # YouTube Category ID (22 is People & Blogs, 20 is Gaming, etc.)
 category_id = "22"
+# OAuth local server host (use "localhost" normally, "127.0.0.1" or loopback for Docker host)
+oauth_host = "localhost"
+# OAuth local server port (0 maps to a random free port)
+oauth_port = 0
 
 [discord]
 # Enable/disable Discord Bot listener

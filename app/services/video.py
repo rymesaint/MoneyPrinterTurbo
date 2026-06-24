@@ -1321,7 +1321,13 @@ def preprocess_video(materials: List[MaterialInfo], clip_duration=4):
 
                 # Output the video to a file.
                 video_file = f"{material_source_path}.mp4"
-                final_clip.write_videofile(video_file, fps=30, logger=None)
+                _write_videofile_with_codec_fallback(
+                    final_clip,
+                    output_file=video_file,
+                    codec=_get_configured_video_codec(),
+                    fps=30,
+                    logger=None,
+                )
                 close_clip(clip)
                 close_clip(final_clip)
                 material.url = video_file

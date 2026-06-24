@@ -488,9 +488,19 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
 
     # 8. Upload to YouTube Shorts (if enabled)
     youtube_results = []
+    
+    # Avoid duplicate uploads if upload_post has already uploaded to youtube
+    uploaded_via_crosspost = False
+    if upload_post.upload_post_service.is_configured() and upload_post.upload_post_service.auto_upload:
+        if "youtube" in upload_post.upload_post_service.platforms:
+            uploaded_via_crosspost = True
+
     if config.youtube.get("enabled", False) and config.youtube.get("auto_upload", False):
-        sm.state.update_task(task_id, progress=90)
-        logger.info("\n\n## uploading videos to YouTube Shorts")
+        if uploaded_via_crosspost:
+            logger.info("⚠️ YouTube Shorts upload skipped: Already handled via cross-post (upload_post).")
+        else:
+            sm.state.update_task(task_id, progress=90)
+            logger.info("\n\n## uploading videos to YouTube Shorts")
         try:
             from app.services.youtube import youtube_service
             

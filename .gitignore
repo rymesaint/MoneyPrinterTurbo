@@ -34,3 +34,11 @@ debug_*.py
 test_*.py
 !test/services/test_*.py
 streamlit.log
+
+# MPT specific overrides
+client_secret_*.json
+*credentials.json
+*.log
+tasks_schedule.csv
+*.mp4
+!intro.mp4

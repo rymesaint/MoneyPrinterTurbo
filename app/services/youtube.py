@@ -58,8 +58,41 @@ class YouTubeService:
             flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_secrets_file(
                 client_secrets_file, self.scopes
             )
-            # This opens a local web server to perform authentication
-            self.credentials = flow.run_local_server(port=0)
+            
+            # Detect headless environment (Docker / remote server)
+            from app.config.config import is_running_in_container
+            in_container = is_running_in_container()
+            is_headless = in_container or os.environ.get("HEADLESS", "").lower() == "true"
+            if os.name == "posix" and not os.environ.get("DISPLAY"):
+                is_headless = True
+                
+            open_browser = not is_headless
+            oauth_port = config.youtube.get("oauth_port", 0)
+            oauth_host = config.youtube.get("oauth_host", "localhost")
+            
+            if is_headless:
+                logger.warning(
+                    "\n========================================================================\n"
+                    "⚠️ HEADLESS ENVIRONMENT DETECTED (Docker or Remote Server)\n"
+                    "Automatic browser opening disabled. Copy the URL below, authorize in your\n"
+                    "local browser, and the credentials will be generated automatically.\n"
+                    "========================================================================\n"
+                )
+                
+            try:
+                self.credentials = flow.run_local_server(
+                    host=oauth_host,
+                    port=oauth_port,
+                    open_browser=open_browser,
+                    authorization_prompt_message="Please visit this URL to authorize the app:\n{url}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"OAuth flow failed: {e}\n"
+                    "Make sure your credentials file is valid, or run MPT locally first "
+                    "to generate 'youtube_credentials.json' and upload it to the server."
+                )
+                return None
             
             # Save the credentials for next run
             with open(credentials_file, "w") as f:
