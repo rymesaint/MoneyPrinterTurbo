@@ -74,9 +74,9 @@ def _bgm_type(value: str) -> str:
     normalized = value.strip().lower()
     if normalized == "none":
         return ""
-    if normalized in {"", "random", "custom"}:
+    if normalized in {"", "random", "custom", "ccmixter"}:
         return normalized
-    raise argparse.ArgumentTypeError("bgm-type must be one of: none, random, custom")
+    raise argparse.ArgumentTypeError("bgm-type must be one of: none, random, custom, ccmixter")
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -117,6 +117,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--video-materials",
         default="",
         help="comma-separated local material paths",
+    )
+    parser.add_argument(
+        "--intro-video-path",
+        default=None,
+        help="path to local intro video clip to prepend",
     )
     parser.add_argument(
         "--stop-at",
@@ -282,6 +287,7 @@ def build_video_params(args: argparse.Namespace) -> VideoParams:
 
     optional_arg_names = [
         "video_language",
+        "intro_video_path",
         "paragraph_number",
         "video_script_prompt",
         "custom_system_prompt",

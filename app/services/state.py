@@ -1,10 +1,52 @@
 import ast
 import copy
 import threading
+import time
 from abc import ABC, abstractmethod
 
 from app.config import config
 from app.models import const
+from app.utils import utils
+
+_last_notifications = {}
+_notification_lock = threading.Lock()
+
+def trigger_task_notification(task_id: str, state: int, progress: int):
+    # Only notify if state or progress changed significantly
+    with _notification_lock:
+        last = _last_notifications.get(task_id)
+        if last:
+            last_state, last_progress, last_time = last
+            # If state changed, notify immediately
+            if last_state != state:
+                should_notify = True
+            # If progress changed, notify only at 0%, 25%, 50%, 75%, 100% or if at least 10s has passed and progress increased by at least 10%
+            elif progress in [0, 25, 50, 75, 100] and last_progress != progress:
+                should_notify = True
+            elif progress - last_progress >= 20 and time.time() - last_time >= 10:
+                should_notify = True
+            else:
+                should_notify = False
+        else:
+            should_notify = True
+
+        if should_notify:
+            _last_notifications[task_id] = (state, progress, time.time())
+
+            # Map state to human readable name
+            if state == const.TASK_STATE_PROCESSING:
+                state_str = "Processing"
+            elif state == const.TASK_STATE_COMPLETE:
+                state_str = "Completed"
+            elif state == const.TASK_STATE_FAILED:
+                state_str = "Failed"
+            else:
+                state_str = "Status Unknown"
+
+            title = f"MoneyPrinterTurbo - Task {task_id}"
+            message = f"{state_str} ({progress}%)"
+
+            utils.send_windows_toast(title, message)
 
 
 # Base class for state management
@@ -54,6 +96,7 @@ class MemoryState(BaseState):
                 "progress": progress,
                 **kwargs,
             }
+        trigger_task_notification(task_id, state, progress)
 
     def get_task(self, task_id: str):
         with self._lock:
@@ -134,6 +177,7 @@ class RedisState(BaseState):
 
         for field, value in fields.items():
             self._redis.hset(task_id, field, str(value))
+        trigger_task_notification(task_id, state, progress)
 
     def get_task(self, task_id: str):
         task_data = self._redis.hgetall(task_id)

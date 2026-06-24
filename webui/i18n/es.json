@@ -59,6 +59,7 @@
     "Background Music": "Música de fondo",
     "No Background Music": "Sin música de fondo",
     "Random Background Music": "Música de fondo aleatoria",
+    "ccMixter Royalty-Free (Matched)": "ccMixter Libre de Derechos (Coincidente)",
     "Custom Background Music": "Música de fondo personalizada",
     "Custom Background Music File": "Introduce la ruta del archivo de música de fondo personalizada:",
     "Background Music Volume": "Volumen de música de fondo (0.2 representa 20%, la música de fondo no debe ser demasiado alta)",
@@ -162,6 +163,7 @@
     "Coverr API Key deleted successfully": "API Key de Coverr eliminada correctamente",
     "Advanced Video Settings": "Configuración avanzada de vídeo",
     "Video Encoder": "Codificador de vídeo",
-    "Video Encoder Help": "Opción avanzada. libx264 es el predeterminado más seguro. Cuando se selecciona un codificador de hardware, la aplicación vuelve a libx264 si el FFmpeg, GPU o controlador actuales no pueden usarlo."
+    "Video Encoder Help": "Opción avanzada. libx264 es el predeterminado más seguro. Cuando se selecciona un codificador de hardware, la aplicación vuelve a libx264 si el FFmpeg, GPU o controlador actuales no pueden usarlo.",
+    "Upload Intro Video": "Subir vídeo de introducción (Opcional)"
   }
 }

@@ -470,7 +470,84 @@ def _download_videos_by_script_order(
     return video_paths
 
 
+def download_ccmixter_bgm(keyword: str, save_dir: str = "") -> str:
+    """
+    Search ccMixter API for keyword and download the first matching track to save_dir.
+    Returns the filename of the downloaded MP3 file (relative to utils.song_dir() or absolute if custom save_dir), or "" if failed.
+    """
+    if not keyword:
+        return ""
+
+    if not save_dir:
+        save_dir = utils.song_dir()
+
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    keyword_clean = "".join(c for c in keyword if c.isalnum() or c.isspace()).strip()
+    if not keyword_clean:
+        keyword_clean = "ambient"
+
+    url = "http://ccmixter.org/api/query"
+    params = {
+        "f": "json",
+        "search": keyword_clean,
+        "limit": 5
+    }
+
+    logger.info(f"searching ccMixter BGM with keyword: '{keyword_clean}'")
+    try:
+        r = requests.get(url, params=params, proxies=config.proxy, timeout=30)
+        if r.status_code != 200:
+            logger.error(f"ccMixter API returned status code {r.status_code}")
+            return ""
+
+        data = r.json()
+        if not data or not isinstance(data, list):
+            logger.warning("No music files found on ccMixter.")
+            return ""
+
+        for track in data:
+            files = track.get("files")
+            if not files or not isinstance(files, list):
+                continue
+
+            for file_info in files:
+                download_url = file_info.get("download_url")
+                file_name = file_info.get("file_name")
+                if download_url and file_name:
+                    # Clean filename to prevent path traversal
+                    safe_name = "".join(c for c in file_name if c.isalnum() or c in "._-").strip()
+                    save_path = os.path.join(save_dir, f"ccmixter-{safe_name}")
+
+                    if os.path.exists(save_path) and os.path.getsize(save_path) > 0:
+                        logger.info(f"ccMixter BGM already exists: {save_path}")
+                        return f"ccmixter-{safe_name}"
+
+                    logger.info(f"downloading ccMixter BGM: {download_url}")
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+                        "Referer": "http://ccmixter.org/"
+                    }
+                    r_dl = requests.get(download_url, headers=headers, proxies=config.proxy, timeout=120)
+                    if r_dl.status_code != 200 or len(r_dl.content) < 10000:
+                        logger.warning(f"Failed to download valid BGM from ccMixter, status: {r_dl.status_code}, length: {len(r_dl.content) if r_dl else 0}")
+                        continue
+
+                    with open(save_path, "wb") as f:
+                        f.write(r_dl.content)
+
+                    if os.path.exists(save_path) and os.path.getsize(save_path) > 10000:
+                        logger.success(f"ccMixter BGM saved to: {save_path}")
+                        return f"ccmixter-{safe_name}"
+    except Exception as e:
+        logger.error(f"Failed to query or download from ccMixter: {str(e)}")
+
+    return ""
+
+
 if __name__ == "__main__":
     download_videos(
         "test123", ["Money Exchange Medium"], audio_duration=100, source="pixabay"
     )
+

@@ -59,6 +59,7 @@
     "Background Music": "Background Music",
     "No Background Music": "No Background Music",
     "Random Background Music": "Random Background Music",
+    "ccMixter Royalty-Free (Matched)": "ccMixter Royalty-Free (Matched)",
     "Custom Background Music": "Custom Background Music",
     "Custom Background Music File": "Please enter the file path for custom background music:",
     "Background Music Volume": "Background Music Volume (0.2 represents 20%, background music should not be too loud)",
@@ -162,6 +163,7 @@
     "Coverr API Key deleted successfully": "Coverr API Key deleted successfully",
     "Advanced Video Settings": "Advanced Video Settings",
     "Video Encoder": "Video Encoder",
-    "Video Encoder Help": "Advanced option. libx264 is the safest default. When a hardware encoder is selected, the app falls back to libx264 if the current FFmpeg, GPU, or driver cannot use it."
+    "Video Encoder Help": "Advanced option. libx264 is the safest default. When a hardware encoder is selected, the app falls back to libx264 if the current FFmpeg, GPU, or driver cannot use it.",
+    "Upload Intro Video": "Upload Intro Video (Optional)"
   }
 }

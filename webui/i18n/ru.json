@@ -59,6 +59,7 @@
     "Background Music": "Фоновая музыка",
     "No Background Music": "Без фоновой музыки",
     "Random Background Music": "Случайная фоновая музыка",
+    "ccMixter Royalty-Free (Matched)": "ccMixter Без лицензионных платежей (Подходящая)",
     "Custom Background Music": "Своя фоновая музыка",
     "Custom Background Music File": "Введите путь к файлу фоновой музыки:",
     "Background Music Volume": "Громкость фоновой музыки (0.2 = 20%; не делайте ее слишком громкой)",
@@ -162,6 +163,7 @@
     "Custom Position (% from top)": "Пользовательское положение (% от верхнего края)",
     "Please enter a value between 0 and 100": "Введите значение от 0 до 100",
     "Please enter a valid number": "Введите корректное число",
-    "Please Select a Valid Video Source": "Выберите поддерживаемый источник материалов"
+    "Please Select a Valid Video Source": "Выберите поддерживаемый источник материалов",
+    "Upload Intro Video": "Загрузить вступительное видео (опционально)"
   }
 }

@@ -288,7 +288,7 @@ def generate_final_videos(
             threads=params.n_threads,
         )
 
-        _progress += 50 / params.video_count / 2
+        _progress += 35 / params.video_count / 2
         sm.state.update_task(task_id, progress=_progress)
 
         final_video_path = path.join(utils.task_dir(task_id), f"final-{index}.mp4")
@@ -302,7 +302,7 @@ def generate_final_videos(
             params=params,
         )
 
-        _progress += 50 / params.video_count / 2
+        _progress += 35 / params.video_count / 2
         sm.state.update_task(task_id, progress=_progress)
 
         final_video_paths.append(final_video_path)
@@ -314,6 +314,24 @@ def generate_final_videos(
 def start(task_id, params: VideoParams, stop_at: str = "video"):
     logger.info(f"start task: {task_id}, stop_at: {stop_at}")
     sm.state.update_task(task_id, state=const.TASK_STATE_PROCESSING, progress=5)
+
+    # Resolve ccMixter background music if requested
+    if getattr(params, "bgm_type", "") == "ccmixter":
+        keyword = params.video_subject or "ambient"
+        try:
+            downloaded_bgm = material.download_ccmixter_bgm(keyword)
+            if downloaded_bgm:
+                params.bgm_type = "custom"
+                params.bgm_file = downloaded_bgm
+                logger.success(f"Matched ccMixter BGM: {downloaded_bgm}")
+            else:
+                logger.warning("Failed to match ccMixter BGM, falling back to random BGM")
+                params.bgm_type = "random"
+                params.bgm_file = ""
+        except Exception as e:
+            logger.error(f"Error downloading ccMixter BGM: {e}")
+            params.bgm_type = "random"
+            params.bgm_file = ""
 
     # 1. Generate script
     video_script = generate_script(task_id, params)
@@ -423,7 +441,10 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
     cross_post_results = []
     if upload_post.upload_post_service.is_configured() and upload_post.upload_post_service.auto_upload:
         logger.info("\n\n## cross-posting videos to TikTok/Instagram")
-        for video_path in final_video_paths:
+        total_cross_posts = len(final_video_paths)
+        for idx, video_path in enumerate(final_video_paths):
+            prog = 85 + (idx / total_cross_posts) * 5
+            sm.state.update_task(task_id, progress=prog)
             result = upload_post.cross_post_video(
                 video_path=video_path,
                 title=params.video_subject or "Check out this video! #shorts #viral"
@@ -433,6 +454,77 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
                 logger.info(f"✅ Cross-posted: {video_path}")
             else:
                 logger.warning(f"⚠️ Failed to cross-post: {video_path} - {result.get('error', 'Unknown error')}")
+
+    # 8. Upload to YouTube Shorts (if enabled)
+    youtube_results = []
+    if config.youtube.get("enabled", False) and config.youtube.get("auto_upload", False):
+        sm.state.update_task(task_id, progress=90)
+        logger.info("\n\n## uploading videos to YouTube Shorts")
+        try:
+            from app.services.youtube import youtube_service
+            
+            # Generate social metadata for YouTube Shorts
+            try:
+                metadata = llm.generate_social_metadata(
+                    video_subject=params.video_subject,
+                    video_script=video_script,
+                    language=params.video_language,
+                    platform="youtube_shorts"
+                )
+                tags = [tag.lstrip("#") for tag in metadata.get("hashtags", [])]
+                meta_title = metadata.get("title")
+                meta_desc = metadata.get("caption")
+            except Exception as ex:
+                logger.warning(f"Failed to generate YouTube social metadata: {ex}")
+                tags = config.youtube.get("tags", ["shorts", "viral", "mpt"])
+                meta_title = None
+                meta_desc = None
+
+            total_videos = len(final_video_paths)
+            for idx, video_path in enumerate(final_video_paths):
+                title = meta_title or params.video_subject or "AI Generated Video"
+                if len(title) > 90:
+                    title = title[:90] + "..."
+                
+                if "#shorts" not in title.lower():
+                    title = f"{title} #shorts"
+
+                base_desc = meta_desc or video_script or ""
+                promotion_and_attribution = (
+                    "\n\n"
+                    "🔔 Jangan lupa LIKE, COMMENT, dan SUBSCRIBE untuk fyp/fakta unik lainnya setiap hari!\n"
+                    "📢 Share video ini agar channel kita semakin berkembang!\n\n"
+                    "🎵 Musik & Video didownload secara legal & bebas royalti (Royalty-Free / Creative Commons).\n"
+                    "Copyright Disclaimer: Under Section 107 of the Copyright Act, allowance is made for fair use.\n\n"
+                    "#shorts #viral #faktaunik #edukasi #otakkepo #trending #ai #shortsfeed"
+                )
+                description = (base_desc + promotion_and_attribution)[:4900]
+                
+                # Callback to update task state during upload chunk progression
+                def make_cb(vid_idx):
+                    def cb(percent):
+                        base_prog = 90 + (vid_idx / total_videos) * 8
+                        current_prog = base_prog + (percent / 100.0) * (8 / total_videos)
+                        sm.state.update_task(task_id, progress=min(98, current_prog))
+                    return cb
+
+                result = youtube_service.upload_video(
+                    video_path=video_path,
+                    title=title,
+                    description=description,
+                    privacy_status="private" if params.publish_at else config.youtube.get("privacy_status", "public"),
+                    category_id=config.youtube.get("category_id", "22"),
+                    tags=tags,
+                    publish_at=params.publish_at,
+                    progress_callback=make_cb(idx)
+                )
+                youtube_results.append(result)
+                if result.get('success'):
+                    logger.info(f"✅ Uploaded to YouTube: {video_path}")
+                else:
+                    logger.warning(f"⚠️ Failed to upload to YouTube: {video_path} - {result.get('error', 'Unknown error')}")
+        except Exception as e:
+            logger.error(f"Failed to execute YouTube upload: {e}")
 
     kwargs = {
         "videos": final_video_paths,
@@ -444,6 +536,7 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
         "subtitle_path": subtitle_path,
         "materials": downloaded_videos,
         "cross_post_results": cross_post_results if cross_post_results else None,
+        "youtube_results": youtube_results if youtube_results else None,
     }
     sm.state.update_task(
         task_id, state=const.TASK_STATE_COMPLETE, progress=100, **kwargs

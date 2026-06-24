@@ -55,6 +55,7 @@
     "Background Music": "Arka Plan Müziği",
     "No Background Music": "Arka Plan Müziği Yok",
     "Random Background Music": "Rastgele Arka Plan Müziği",
+    "ccMixter Royalty-Free (Matched)": "ccMixter Telifsiz Müzik (Eşleşen)",
     "Custom Background Music": "Özel Arka Plan Müziği",
     "Custom Background Music File": "Lütfen özel arka plan müziği dosya yolunu girin:",
     "Background Music Volume": "Arka Plan Müziği Ses Seviyesi (0.2, %20 anlamına gelir, arka plan müziği çok yüksek olmamalı)",
@@ -160,6 +161,7 @@
     "Coverr API Key deleted successfully": "Coverr API Anahtarı başarıyla silindi",
     "Advanced Video Settings": "Gelişmiş Video Ayarları",
     "Video Encoder": "Video Kodlayıcı",
-    "Video Encoder Help": "Gelişmiş seçenek. libx264 en güvenli varsayılandır. Donanım kodlayıcı seçildiğinde mevcut FFmpeg, GPU veya sürücü bunu kullanamıyorsa uygulama libx264'ye geri döner."
+    "Video Encoder Help": "Gelişmiş seçenek. libx264 en güvenli varsayılandır. Donanım kodlayıcı seçildiğinde mevcut FFmpeg, GPU veya sürücü bunu kullanamıyorsa uygulama libx264'ye geri döner.",
+    "Upload Intro Video": "Giriş Videosu Yükle (İsteğe Bağlı)"
   }
 }

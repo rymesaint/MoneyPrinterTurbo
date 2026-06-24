@@ -48,6 +48,7 @@
     "Background Music": "Música de Fundo",
     "No Background Music": "Sem Música de Fundo",
     "Random Background Music": "Música de Fundo Aleatória",
+    "ccMixter Royalty-Free (Matched)": "ccMixter Livre de Royalties (Combinada)",
     "Custom Background Music": "Música de Fundo Personalizada",
     "Custom Background Music File": "Por favor, insira o caminho do arquivo para a música de fundo personalizada:",
     "Background Music Volume": "Volume da Música de Fundo (0.2 representa 20%, a música de fundo não deve ser muito alta)",
@@ -142,6 +143,7 @@
     "Coverr API Key added successfully": "Chave de API do Coverr adicionada com sucesso",
     "Select Coverr API Key to delete": "Selecione a chave de API do Coverr para excluir",
     "Delete Selected Coverr API Key": "Excluir chave de API do Coverr selecionada",
-    "Coverr API Key deleted successfully": "Chave de API do Coverr excluída com sucesso"
+    "Coverr API Key deleted successfully": "Chave de API do Coverr excluída com sucesso",
+    "Upload Intro Video": "Carregar vídeo de introdução (Opcional)"
   }
 }

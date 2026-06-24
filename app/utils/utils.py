@@ -95,6 +95,29 @@ def task_dir(sub_dir: str = ""):
     return d
 
 
+def clean_old_tasks(max_age_days: int = 14):
+    import time
+    t_dir = task_dir()
+    if not os.path.exists(t_dir):
+        return
+    now = time.time()
+    cutoff = now - (max_age_days * 24 * 3600)
+    deleted_count = 0
+    for item in os.listdir(t_dir):
+        item_path = os.path.join(t_dir, item)
+        if os.path.isdir(item_path):
+            try:
+                mtime = os.path.getmtime(item_path)
+                if mtime < cutoff:
+                    shutil.rmtree(item_path)
+                    deleted_count += 1
+            except Exception as e:
+                logger.error(f"failed to delete old task dir {item_path}: {e}")
+    if deleted_count > 0:
+        logger.info(f"cleaned up {deleted_count} old task directories older than {max_age_days} days")
+
+
+
 def font_dir(sub_dir: str = ""):
     d = resource_dir("fonts")
     if sub_dir:
@@ -309,3 +332,41 @@ def load_locales(i18n_dir):
 
 def parse_extension(filename):
     return Path(filename).suffix.lower().lstrip('.')
+
+
+def send_windows_toast(title: str, message: str):
+    """
+    Sends a Windows toast/balloon notification using PowerShell.
+    Does nothing on non-Windows platforms.
+    Runs asynchronously in a background thread to prevent blocking.
+    """
+    import platform
+    if platform.system() != "Windows":
+        return
+
+    import subprocess
+    ps_code = f"""
+[void] [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')
+$notification = New-Object System.Windows.Forms.NotifyIcon
+$notification.Icon = [System.Drawing.SystemIcons]::Information
+$notification.BalloonTipIcon = 'Info'
+$notification.BalloonTipTitle = '{title}'
+$notification.BalloonTipText = '{message}'
+$notification.Visible = $True
+$notification.ShowBalloonTip(5000)
+Start-Sleep -s 6
+$notification.Dispose()
+"""
+    def run():
+        try:
+            subprocess.Popen(
+                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_code],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=0x08000000  # CREATE_NO_WINDOW
+            )
+        except Exception:
+            pass
+
+    threading.Thread(target=run, daemon=True).start()
+

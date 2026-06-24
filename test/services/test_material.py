@@ -426,5 +426,37 @@ class TestCoverrProvider(unittest.TestCase):
         self.assertEqual(result, ["/tmp/coverr-saved.mp4"])
 
 
+class TestCcMixterBgm(unittest.TestCase):
+    def test_download_ccmixter_bgm_success(self):
+        fake_response = SimpleNamespace(
+            status_code=200,
+            json=lambda: [
+                {
+                    "upload_name": "What's Next",
+                    "files": [
+                        {
+                            "file_name": "AlexBeroza_-_What_s_Next.mp3",
+                            "download_url": "https://ccmixter.org/content/AlexBeroza/AlexBeroza_-_What_s_Next.mp3"
+                        }
+                    ]
+                }
+            ]
+        )
+        fake_dl_response = SimpleNamespace(
+            status_code=200,
+            content=b"fake-mp3-content" * 1000
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch("app.services.material.requests.get", side_effect=[fake_response, fake_dl_response]) as mock_get:
+                filename = material.download_ccmixter_bgm(keyword="chill", save_dir=temp_dir)
+
+            self.assertEqual(filename, "ccmixter-AlexBeroza_-_What_s_Next.mp3")
+            download_path = os.path.join(temp_dir, filename)
+            self.assertTrue(os.path.exists(download_path))
+            self.assertEqual(Path(download_path).read_bytes(), b"fake-mp3-content" * 1000)
+
+
 if __name__ == "__main__":
     unittest.main()
+

@@ -73,10 +73,28 @@ app.mount("/", StaticFiles(directory=public_dir, html=True), name="")
 
 
 @app.on_event("shutdown")
-def shutdown_event():
+async def shutdown_event():
     logger.info("shutdown event")
+    if config.discord.get("enabled", False):
+        try:
+            from app.services.discord_bot import discord_client
+            if discord_client:
+                logger.info("Stopping Hermes Discord Bot...")
+                await discord_client.close()
+        except Exception as e:
+            logger.error(f"Error closing Discord Bot: {e}")
 
 
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
     logger.info("startup event")
+    try:
+        utils.clean_old_tasks(max_age_days=14)
+    except Exception as e:
+        logger.error(f"failed to clean up old tasks: {e}")
+
+    if config.discord.get("enabled", False):
+        import asyncio
+        from app.services.discord_bot import start_discord_bot
+        logger.info("Starting Hermes Discord Bot...")
+        asyncio.create_task(start_discord_bot())

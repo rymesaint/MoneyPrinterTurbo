@@ -14,6 +14,7 @@ from typing import List
 from loguru import logger
 import numpy as np
 from moviepy import (
+    AudioClip,
     AudioFileClip,
     ColorClip,
     CompositeAudioClip,
@@ -877,10 +878,10 @@ def generate_video(
     video_width, video_height = aspect.to_resolution()
 
     logger.info(f"generating video: {video_width} x {video_height}")
-    logger.info(f"  ① video: {video_path}")
-    logger.info(f"  ② audio: {audio_path}")
-    logger.info(f"  ③ subtitle: {subtitle_path}")
-    logger.info(f"  ④ output: {output_file}")
+    logger.info(f"  1. video: {video_path}")
+    logger.info(f"  2. audio: {audio_path}")
+    logger.info(f"  3. subtitle: {subtitle_path}")
+    logger.info(f"  4. output: {output_file}")
 
     # https://github.com/harry0703/MoneyPrinterTurbo/issues/217
     # PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'final-1.mp4.tempTEMP_MPY_wvf_snd.mp3'
@@ -895,7 +896,7 @@ def generate_video(
         if os.name == "nt":
             font_path = font_path.replace("\\", "/")
 
-        logger.info(f"  ⑤ font: {font_path}")
+        logger.info(f"  5. font: {font_path}")
 
     def resolve_subtitle_background_color():
         # 兼容历史参数：API 里 `text_background_color` 既可能是布尔值，
@@ -1092,9 +1093,17 @@ def generate_video(
     # 显式沿用输入音频的采样率；如果取不到，再回退到 MoviePy 默认的 44100Hz。
     # 这样可以减少不同运行环境，尤其是 Docker 环境中再次重采样带来的音质波动。
     output_audio_fps = int(getattr(audio_clip, "fps", 0) or 44100)
+
+    intro_video_path = getattr(params, "intro_video_path", None)
+    has_intro = bool(intro_video_path and os.path.exists(intro_video_path))
+
+    actual_output_file = output_file
+    if has_intro:
+        actual_output_file = os.path.join(output_dir, "temp-main-without-intro.mp4")
+
     _write_videofile_with_codec_fallback(
         video_clip,
-        output_file=output_file,
+        output_file=actual_output_file,
         codec=_get_configured_video_codec(),
         audio_codec=audio_codec,
         audio_fps=output_audio_fps,
@@ -1106,6 +1115,102 @@ def generate_video(
     )
     video_clip.close()
     del video_clip
+
+    if has_intro:
+        success = prepend_intro_video(
+            intro_path=intro_video_path,
+            main_video_path=actual_output_file,
+            output_path=output_file,
+            video_width=video_width,
+            video_height=video_height,
+            output_audio_fps=output_audio_fps,
+            threads=params.n_threads or 2,
+        )
+        if not success:
+            logger.error("failed to prepend intro video, using main video instead")
+            shutil.move(actual_output_file, output_file)
+        else:
+            delete_files(actual_output_file)
+
+
+def prepend_intro_video(
+    intro_path: str,
+    main_video_path: str,
+    output_path: str,
+    video_width: int,
+    video_height: int,
+    output_audio_fps: int,
+    threads: int = 2,
+) -> bool:
+    if not intro_path or not os.path.exists(intro_path):
+        logger.warning(f"intro video path does not exist: {intro_path}")
+        return False
+
+    output_dir = os.path.dirname(output_path)
+    import uuid
+    temp_intro_standardized = os.path.join(output_dir, f"temp-intro-{uuid.uuid4().hex}.mp4")
+
+    try:
+        logger.info(f"standardizing intro video: {intro_path} -> {video_width}x{video_height}")
+        clip = _open_video_clip_quietly(intro_path, audio=True)
+        clip_w, clip_h = clip.size
+        clip_ratio = clip_w / clip_h
+        target_ratio = video_width / video_height
+
+        if clip_w != video_width or clip_h != video_height:
+            logger.debug(f"resizing intro clip: {clip_w}x{clip_h} -> {video_width}x{video_height}")
+            if abs(clip_ratio - target_ratio) < 0.01:
+                clip = clip.resized(new_size=(video_width, video_height))
+            else:
+                if clip_ratio > target_ratio:
+                    scale_factor = video_width / clip_w
+                else:
+                    scale_factor = video_height / clip_h
+                new_width = int(clip_w * scale_factor)
+                new_height = int(clip_h * scale_factor)
+
+                background = ColorClip(size=(video_width, video_height), color=(0, 0, 0)).with_duration(clip.duration)
+                clip_resized = clip.resized(new_size=(new_width, new_height)).with_position("center")
+                if clip.audio is not None:
+                    clip_resized = clip_resized.with_audio(clip.audio)
+                clip = CompositeVideoClip([background, clip_resized])
+
+        if clip.audio is None:
+            logger.debug("intro clip has no audio, creating silent audio track")
+            silent_audio = AudioClip(
+                frame_function=lambda t: np.zeros(2) if np.isscalar(t) else np.zeros((len(t), 2)),
+                duration=clip.duration,
+            )
+            clip = clip.with_audio(silent_audio)
+
+        effective_codec = _get_effective_video_codec()
+        _write_videofile_with_codec_fallback(
+            clip,
+            temp_intro_standardized,
+            codec=effective_codec,
+            audio_codec=audio_codec,
+            audio_fps=output_audio_fps,
+            audio_bitrate=audio_bitrate,
+            temp_audiofile_path=_get_temp_audio_dir(output_dir),
+            threads=threads,
+            logger=None,
+            fps=fps,
+        )
+        close_clip(clip)
+
+        logger.info(f"concatenating intro and main video to {output_path}")
+        concat_video_clips_with_ffmpeg(
+            clip_files=[temp_intro_standardized, main_video_path],
+            output_file=output_path,
+            threads=threads,
+            output_dir=output_dir,
+        )
+        return True
+    except Exception as e:
+        logger.error(f"failed to prepend intro video: {str(e)}")
+        return False
+    finally:
+        delete_files(temp_intro_standardized)
 
 
 def preprocess_video(materials: List[MaterialInfo], clip_duration=4):

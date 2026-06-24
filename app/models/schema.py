@@ -86,7 +86,9 @@ class VideoParams(BaseModel):
     )
     
     custom_audio_file: Optional[str] = None  # Custom audio file path, will ignore video_script and disable subtitle
+    intro_video_path: Optional[str] = None  # Custom intro video path to prepend to output
     video_language: Optional[str] = ""  # auto detect
+    publish_at: Optional[str] = None  # ISO 8601 string for YouTube scheduling
 
     voice_name: Optional[str] = ""
     voice_volume: Optional[float] = 1.0

@@ -574,6 +574,33 @@ class TestVideoService(unittest.TestCase):
                     result = vd._get_temp_audio_dir("/some/output/dir")
                     self.assertEqual(result, "/some/output/dir")
 
+    def test_prepend_intro_video_success(self):
+        """
+        Verify that prepend_intro_video successfully standardizes the intro 
+        and concats it with the main video.
+        """
+        intro_video_path = os.path.join(resources_dir, "1.png.mp4")
+        main_video_path = os.path.join(resources_dir, "1.png.mp4")
+        if not os.path.exists(intro_video_path):
+            self.skipTest(f"test video not found: {intro_video_path}")
+            
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = os.path.join(temp_dir, "output.mp4")
+            
+            success = vd.prepend_intro_video(
+                intro_path=intro_video_path,
+                main_video_path=main_video_path,
+                output_path=output_file,
+                video_width=1080,
+                video_height=1920,
+                output_audio_fps=44100,
+                threads=1,
+            )
+            
+            self.assertTrue(success)
+            self.assertTrue(os.path.exists(output_file))
+            self.assertGreater(os.path.getsize(output_file), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

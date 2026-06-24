@@ -153,6 +153,8 @@ def save_config():
         _cfg["azure"] = azure
         _cfg["siliconflow"] = siliconflow
         _cfg["ui"] = ui
+        _cfg["discord"] = discord
+        _cfg["youtube"] = youtube
         f.write(toml.dumps(_cfg))
 
 
@@ -168,6 +170,8 @@ ui = _cfg.get(
         "hide_log": False,
     },
 )
+discord = _cfg.get("discord", {})
+youtube = _cfg.get("youtube", {})
 
 hostname = socket.gethostname()
 

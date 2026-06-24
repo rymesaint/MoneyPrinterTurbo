@@ -376,3 +376,28 @@ upload_post_platforms = ["tiktok", "instagram"]
 
 # Automatically cross-post videos after generation (if false, you'll need to call the API manually)
 upload_post_auto_upload = false
+
+[youtube]
+# Enable/disable YouTube integration
+enabled = false
+# Automatically upload generated videos to YouTube Shorts
+auto_upload = false
+# Path to client_secrets.json downloaded from Google Cloud Console
+client_secrets_file = "youtube_client_secrets.json"
+# Path to save/retrieve user OAuth credentials
+credentials_file = "youtube_credentials.json"
+# Privacy status of the uploaded video: "public", "private", "unlisted"
+privacy_status = "public"
+# Default tags for the video upload
+tags = ["shorts", "viral", "mpt"]
+# YouTube Category ID (22 is People & Blogs, 20 is Gaming, etc.)
+category_id = "22"
+
+[discord]
+# Enable/disable Discord Bot listener
+enabled = false
+# Discord Bot Token
+bot_token = ""
+# Channel ID where the bot listens to and reports video generation progress
+channel_id = ""
+

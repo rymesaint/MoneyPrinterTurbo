@@ -691,6 +691,7 @@ params.match_materials_to_script = bool(
 )
 uploaded_files = []
 uploaded_audio_file = None
+uploaded_intro_file = None
 
 with left_panel:
     with st.container(border=True):
@@ -936,6 +937,13 @@ with middle_panel:
                 help=tr("Video Encoder Help"),
             )
             config.app["video_codec"] = video_codec_options[selected_codec_index][1]
+
+            uploaded_intro_file = st.file_uploader(
+                tr("Upload Intro Video"),
+                type=["mp4", "mov", "avi", "flv", "mkv"],
+                accept_multiple_files=False,
+                key="intro_file_uploader",
+            )
     with st.container(border=True):
         st.write(tr("Audio Settings"))
 
@@ -1190,6 +1198,7 @@ with middle_panel:
         bgm_options = [
             (tr("No Background Music"), ""),
             (tr("Random Background Music"), "random"),
+            (tr("ccMixter Royalty-Free (Matched)"), "ccmixter"),
             (tr("Custom Background Music"), "custom"),
         ]
         selected_index = st.selectbox(
@@ -1477,6 +1486,15 @@ if start_button:
         with open(custom_audio_path, "wb") as f:
             f.write(uploaded_audio_file.getbuffer())
         params.custom_audio_file = custom_audio_path
+
+    if uploaded_intro_file:
+        task_dir = utils.task_dir(task_id)
+        _, intro_ext = os.path.splitext(os.path.basename(uploaded_intro_file.name))
+        intro_ext = intro_ext.lower() or ".mp4"
+        intro_video_path = os.path.join(task_dir, f"intro-video{intro_ext}")
+        with open(intro_video_path, "wb") as f:
+            f.write(uploaded_intro_file.getbuffer())
+        params.intro_video_path = intro_video_path
 
     if uploaded_files:
         local_videos_dir = utils.storage_dir("local_videos", create=True)
