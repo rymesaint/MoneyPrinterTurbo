@@ -186,4 +186,202 @@ class YouTubeService:
             logger.error(f"Failed to upload video to YouTube: {e}")
             return {"success": False, "error": str(e)}
 
+    def handle_api_error(self, e: Exception) -> dict:
+        error_msg = str(e)
+        if isinstance(e, HttpError) and e.resp.status == 403:
+            error_msg = "Insufficient API scopes or permission error. Please verify your YouTube API access."
+        return {"success": False, "error": error_msg}
+
+    def get_channel_info(self) -> dict:
+        if not self.is_configured():
+            return {"success": False, "error": "YouTube integration is not configured"}
+        try:
+            youtube = self.get_authenticated_service()
+            if not youtube:
+                return {"success": False, "error": "Authentication failed"}
+            
+            try:
+                res = youtube.channels().list(part="snippet,statistics,contentDetails", mine=True).execute()
+                if res.get("items"):
+                    item = res["items"][0]
+                    snippet = item.get("snippet", {})
+                    stats = item.get("statistics", {})
+                    content_details = item.get("contentDetails", {})
+                    uploads_playlist = content_details.get("relatedPlaylists", {}).get("uploads")
+                    return {
+                        "success": True,
+                        "title": snippet.get("title"),
+                        "customUrl": snippet.get("customUrl"),
+                        "thumbnails": snippet.get("thumbnails", {}),
+                        "viewCount": stats.get("viewCount", "0"),
+                        "subscriberCount": stats.get("subscriberCount", "0"),
+                        "videoCount": stats.get("videoCount", "0"),
+                        "uploads_playlist": uploads_playlist
+                    }
+            except Exception as e:
+                if hasattr(e, "resp") and e.resp.status == 403:
+                    logger.warning("Insufficient scope for channels API. Using fallback profile details.")
+                    return {
+                        "success": True,
+                        "title": "My YouTube Channel",
+                        "customUrl": "",
+                        "thumbnails": {},
+                        "viewCount": "N/A",
+                        "subscriberCount": "N/A",
+                        "videoCount": "N/A",
+                        "uploads_playlist": None
+                    }
+                raise e
+            return {"success": False, "error": "No channel found"}
+        except Exception as e:
+            logger.error(f"Failed to get channel info: {e}")
+            return self.handle_api_error(e)
+
+    def get_my_videos(self, max_results=10) -> dict:
+        if not self.is_configured():
+            return {"success": False, "error": "YouTube integration is not configured"}
+        try:
+            youtube = self.get_authenticated_service()
+            if not youtube:
+                return {"success": False, "error": "Authentication failed"}
+            
+            video_ids = []
+            use_history_fallback = False
+            
+            try:
+                # 1. Get channel uploads playlist
+                channel_res = youtube.channels().list(part="contentDetails", mine=True).execute()
+                if channel_res.get("items"):
+                    uploads_playlist = channel_res["items"][0].get("contentDetails", {}).get("relatedPlaylists", {}).get("uploads")
+                    if uploads_playlist:
+                        # 2. Get playlist items
+                        playlist_res = youtube.playlistItems().list(
+                            part="snippet,contentDetails",
+                            playlistId=uploads_playlist,
+                            maxResults=max_results
+                        ).execute()
+                        video_items = playlist_res.get("items", [])
+                        video_ids = [item.get("contentDetails", {}).get("videoId") for item in video_items if item.get("contentDetails", {}).get("videoId")]
+            except Exception as e:
+                if hasattr(e, "resp") and e.resp.status == 403:
+                    logger.warning("Insufficient scope for uploads playlist. Falling back to local task history.")
+                    use_history_fallback = True
+                else:
+                    raise e
+
+            if use_history_fallback or not video_ids:
+                from app.services.state import state as task_state
+                try:
+                    tasks, _ = task_state.get_all_tasks(page=1, page_size=100)
+                    for task in tasks:
+                        yt_res = task.get("youtube_results")
+                        if yt_res and isinstance(yt_res, list):
+                            for res in yt_res:
+                                if isinstance(res, dict) and res.get("success") and res.get("video_id"):
+                                    video_ids.append(res.get("video_id"))
+                    # De-duplicate while preserving order
+                    seen = set()
+                    video_ids = [x for x in video_ids if not (x in seen or seen.add(x))][:max_results]
+                except Exception as task_err:
+                    logger.error(f"Failed to fetch uploaded video IDs from task history: {task_err}")
+            
+            if not video_ids:
+                return {"success": True, "videos": []}
+            
+            # 3. Get video statistics & status
+            video_res = youtube.videos().list(
+                part="snippet,statistics,status",
+                id=",".join(video_ids)
+            ).execute()
+            
+            videos = []
+            for item in video_res.get("items", []):
+                snippet = item.get("snippet", {})
+                stats = item.get("statistics", {})
+                status = item.get("status", {})
+                videos.append({
+                    "id": item.get("id"),
+                    "title": snippet.get("title"),
+                    "description": snippet.get("description"),
+                    "publishedAt": snippet.get("publishedAt"),
+                    "thumbnails": snippet.get("thumbnails"),
+                    "viewCount": stats.get("viewCount", "0"),
+                    "likeCount": stats.get("likeCount", "0"),
+                    "commentCount": stats.get("commentCount", "0"),
+                    "privacyStatus": status.get("privacyStatus"),
+                    "publishAt": status.get("publishAt"),
+                    "uploadStatus": status.get("uploadStatus"),
+                })
+            return {"success": True, "videos": videos}
+        except Exception as e:
+            logger.error(f"Failed to get channel videos: {e}")
+            return self.handle_api_error(e)
+
+    def get_video_stats(self, video_id: str) -> dict:
+        if not self.is_configured():
+            return {"success": False, "error": "YouTube integration is not configured"}
+        try:
+            youtube = self.get_authenticated_service()
+            if not youtube:
+                return {"success": False, "error": "Authentication failed"}
+            res = youtube.videos().list(part="snippet,statistics,status", id=video_id).execute()
+            if not res.get("items"):
+                return {"success": False, "error": "Video not found"}
+            item = res["items"][0]
+            snippet = item.get("snippet", {})
+            stats = item.get("statistics", {})
+            status = item.get("status", {})
+            return {
+                "success": True,
+                "video": {
+                    "id": item.get("id"),
+                    "title": snippet.get("title"),
+                    "description": snippet.get("description"),
+                    "publishedAt": snippet.get("publishedAt"),
+                    "thumbnails": snippet.get("thumbnails"),
+                    "channelTitle": snippet.get("channelTitle"),
+                    "viewCount": stats.get("viewCount", "0"),
+                    "likeCount": stats.get("likeCount", "0"),
+                    "commentCount": stats.get("commentCount", "0"),
+                    "privacyStatus": status.get("privacyStatus"),
+                    "publishAt": status.get("publishAt"),
+                    "uploadStatus": status.get("uploadStatus"),
+                }
+            }
+        except Exception as e:
+            logger.error(f"Failed to get video stats: {e}")
+            return self.handle_api_error(e)
+
+    def get_trending_videos(self, region_code="US", max_results=10) -> dict:
+        if not self.is_configured():
+            return {"success": False, "error": "YouTube integration is not configured"}
+        try:
+            youtube = self.get_authenticated_service()
+            if not youtube:
+                return {"success": False, "error": "Authentication failed"}
+            res = youtube.videos().list(
+                part="snippet,statistics",
+                chart="mostPopular",
+                regionCode=region_code,
+                maxResults=max_results
+            ).execute()
+            videos = []
+            for item in res.get("items", []):
+                snippet = item.get("snippet", {})
+                stats = item.get("statistics", {})
+                videos.append({
+                    "id": item.get("id"),
+                    "title": snippet.get("title"),
+                    "channelTitle": snippet.get("channelTitle"),
+                    "publishedAt": snippet.get("publishedAt"),
+                    "thumbnails": snippet.get("thumbnails"),
+                    "viewCount": stats.get("viewCount", "0"),
+                    "likeCount": stats.get("likeCount", "0"),
+                    "commentCount": stats.get("commentCount", "0"),
+                })
+            return {"success": True, "videos": videos}
+        except Exception as e:
+            logger.error(f"Failed to get trending videos: {e}")
+            return self.handle_api_error(e)
+
 youtube_service = YouTubeService()

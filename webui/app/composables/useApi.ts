@@ -41,6 +41,12 @@ export function useApi() {
     getBgmList: () => get('/musics'),
     getVideoMaterials: () => get('/video_materials'),
 
+    // YouTube Stats & Trends
+    getYoutubeStatus: () => get('/youtube/status'),
+    getYoutubeVideos: (maxResults = 10) => get(`/youtube/my-videos?max_results=${maxResults}`),
+    getYoutubeVideoStats: (videoId: string) => get(`/youtube/video-stats?video_id=${encodeURIComponent(videoId)}`),
+    getYoutubeTrends: (region = 'US', maxResults = 10) => get(`/youtube/trends?region=${encodeURIComponent(region)}&max_results=${maxResults}`),
+
     // Raw fetch for file uploads and streaming
     uploadFile: async (file: File) => {
       const fd = new FormData()

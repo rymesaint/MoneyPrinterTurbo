@@ -24,6 +24,13 @@
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h8v2H2v-2z"/></svg>
           {{ tr('Tasks') }}
         </button>
+        <button class="nav-item" :class="{ active: activeTab === 'youtube' }" @click="activeTab = 'youtube'; loadYoutubeData()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"></path>
+            <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" fill="currentColor"></polygon>
+          </svg>
+          {{ tr('YouTube Stats') }}
+        </button>
         <button class="nav-item" :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"></circle>
@@ -45,7 +52,7 @@
       <!-- Top bar -->
       <header class="topbar">
         <h1 class="page-title">
-          {{ activeTab === 'create' ? tr('Create Video') : activeTab === 'tasks' ? tr('Tasks') : tr('Settings') }}
+          {{ activeTab === 'create' ? tr('Create Video') : activeTab === 'tasks' ? tr('Tasks') : activeTab === 'youtube' ? tr('YouTube Stats') : tr('Settings') }}
         </h1>
       </header>
 
@@ -838,6 +845,435 @@
           </div>
         </div>
       </div>
+
+      <!-- YouTube Stats Tab -->
+      <div v-else-if="activeTab === 'youtube'" class="content">
+        <div v-if="loadingYoutubeStatus" class="loading-state">
+          <span class="spinner"></span>
+          <span class="loading-text">{{ tr('Loading YouTube channel status...') }}</span>
+        </div>
+        
+        <template v-else>
+          <!-- Configuration warning if success is false -->
+          <div v-if="youtubeStatus && !youtubeStatus.success" class="empty-state" style="padding: var(--sp-8) var(--sp-4);">
+            <div class="empty-icon" style="color: var(--danger);">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+            </div>
+            <h3 class="empty-title">{{ tr('YouTube Integration Not Connected') }}</h3>
+            <p class="empty-desc" style="max-width: 480px; margin: var(--sp-2) auto var(--sp-6);">
+              {{ youtubeStatus.error || tr('Please verify your YouTube configuration in settings and complete the authorization flow.') }}
+            </p>
+            <button class="btn-hero" @click="activeTab = 'settings'; activeSettingsTab = 'integrations'">
+              {{ tr('Configure YouTube Settings') }}
+            </button>
+          </div>
+
+          <!-- YouTube Dashboard -->
+          <div v-else-if="youtubeStatus && youtubeStatus.success" class="youtube-dashboard">
+            <!-- Channel Header Card -->
+            <div class="channel-card">
+              <div class="channel-profile">
+                <img 
+                  v-if="youtubeStatus.thumbnails?.default?.url" 
+                  :src="youtubeStatus.thumbnails.default.url" 
+                  class="channel-avatar" 
+                  alt="Avatar"
+                />
+                <div v-else class="channel-avatar-placeholder">
+                  {{ youtubeStatus.title?.slice(0, 1).toUpperCase() }}
+                </div>
+                <div class="channel-meta">
+                  <h2 class="channel-title">{{ youtubeStatus.title }}</h2>
+                  <p class="channel-handle" v-if="youtubeStatus.customUrl">{{ youtubeStatus.customUrl }}</p>
+                </div>
+              </div>
+
+              <!-- Mini Stats Grid -->
+              <div class="channel-stats-row">
+                <div class="channel-stat-item">
+                  <span class="stat-num">{{ formatNumber(youtubeStatus.subscriberCount) }}</span>
+                  <span class="stat-label">{{ tr('Subscribers') }}</span>
+                </div>
+                <div class="channel-stat-item">
+                  <span class="stat-num">{{ formatNumber(youtubeStatus.viewCount) }}</span>
+                  <span class="stat-label">{{ tr('Total Views') }}</span>
+                </div>
+                <div class="channel-stat-item">
+                  <span class="stat-num">{{ formatNumber(youtubeStatus.videoCount) }}</span>
+                  <span class="stat-label">{{ tr('Videos') }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- YouTube Tab switcher -->
+            <div class="youtube-subtabs">
+              <button 
+                class="subtab-btn" 
+                :class="{ active: activeYoutubeSubTab === 'my-videos' }" 
+                @click="activeYoutubeSubTab = 'my-videos'"
+              >
+                {{ tr('My Uploads') }}
+              </button>
+              <button 
+                class="subtab-btn" 
+                :class="{ active: activeYoutubeSubTab === 'trends' }" 
+                @click="activeYoutubeSubTab = 'trends'"
+              >
+                {{ tr('YouTube Trends') }}
+              </button>
+              <button 
+                class="subtab-btn" 
+                :class="{ active: activeYoutubeSubTab === 'search' }" 
+                @click="activeYoutubeSubTab = 'search'"
+              >
+                {{ tr('Lookup Video') }}
+              </button>
+            </div>
+
+            <!-- Subtab Content: My Uploads -->
+            <div v-if="activeYoutubeSubTab === 'my-videos'" class="subtab-content">
+              <div v-if="loadingYoutubeVideos" class="loading-state" style="padding: var(--sp-6) 0;">
+                <span class="spinner"></span>
+                <span class="loading-text">{{ tr('Loading uploaded videos...') }}</span>
+              </div>
+              <div v-else-if="youtubeVideos.length === 0" class="empty-state" style="padding: var(--sp-6) 0;">
+                <p class="empty-desc">{{ tr('No recent video uploads found.') }}</p>
+              </div>
+              <div v-else class="my-videos-analytics">
+                <!-- Analytics Section -->
+                <div class="analytics-section">
+                  <!-- Chart Card -->
+                  <div class="chart-card">
+                    <div class="chart-header">
+                      <h3 class="chart-title">{{ tr('Upload Performance Trend') }}</h3>
+                      <div class="metric-selector">
+                        <button 
+                          v-for="m in ['views', 'likes', 'comments']" 
+                          :key="m"
+                          class="metric-btn"
+                          :class="{ active: selectedChartMetric === m }"
+                          @click="selectedChartMetric = m"
+                        >
+                          {{ tr(m.charAt(0).toUpperCase() + m.slice(1)) }}
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <!-- Interactive SVG Chart -->
+                    <div class="svg-chart-container">
+                      <svg 
+                        width="100%" 
+                        height="220" 
+                        viewBox="0 0 600 220" 
+                        preserveAspectRatio="none"
+                        class="trend-svg"
+                        @mouseleave="hoveredPoint = null"
+                      >
+                        <!-- Grid lines -->
+                        <line x1="35" y1="30" x2="565" y2="30" stroke="var(--edge)" stroke-dasharray="4,4" />
+                        <line x1="35" y1="75" x2="565" y2="75" stroke="var(--edge)" stroke-dasharray="4,4" />
+                        <line x1="35" y1="120" x2="565" y2="120" stroke="var(--edge)" stroke-dasharray="4,4" />
+                        <line x1="35" y1="165" x2="565" y2="165" stroke="var(--edge)" stroke-dasharray="4,4" />
+                        
+                        <!-- Area under path with gradient -->
+                        <path 
+                          v-if="chartPaths.areaPath"
+                          :d="chartPaths.areaPath" 
+                          fill="url(#chartGradient)" 
+                          opacity="0.15" 
+                        />
+                        
+                        <!-- Line path -->
+                        <path 
+                          v-if="chartPaths.linePath"
+                          :d="chartPaths.linePath" 
+                          fill="none" 
+                          stroke="var(--brand)" 
+                          stroke-width="3" 
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                        
+                        <!-- Interactive Points -->
+                        <circle 
+                          v-for="(pt, idx) in chartPoints" 
+                          :key="idx"
+                          :cx="pt.x" 
+                          :cy="pt.y" 
+                          r="6" 
+                          :fill="hoveredPoint?.index === idx ? 'var(--brand-hover)' : 'var(--brand)'"
+                          stroke="var(--surface-1)"
+                          stroke-width="2"
+                          class="chart-node"
+                          @mouseenter="hoveredPoint = { index: idx, ...pt }"
+                        />
+                        
+                        <!-- Definitions for gradient -->
+                        <defs>
+                          <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="var(--brand)" />
+                            <stop offset="100%" stop-color="var(--brand)" stop-opacity="0" />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                    </div>
+                    
+                    <!-- Tooltip info display inside the card -->
+                    <div class="chart-tooltip-display" v-if="hoveredPoint">
+                      <img 
+                        v-if="hoveredPoint.video.thumbnails?.default?.url"
+                        :src="hoveredPoint.video.thumbnails.default.url" 
+                        class="tooltip-thumb"
+                      />
+                      <div class="tooltip-info">
+                        <p class="tooltip-title">{{ hoveredPoint.video.title }}</p>
+                        <p class="tooltip-meta">
+                          <span>{{ formatDate(hoveredPoint.video.publishedAt) }}</span>
+                          <span class="tooltip-value">
+                            <strong>{{ formatNumber(hoveredPoint.value) }}</strong> {{ tr(selectedChartMetric) }}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                    <div v-else class="chart-tooltip-placeholder">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--sp-1);">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 16v-4M12 8h.01" />
+                      </svg>
+                      <span>{{ tr('Hover over points on the chart to see video details.') }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Insights Card -->
+                  <div class="insights-card">
+                    <h3 class="insights-title">{{ tr('Performance Insights') }}</h3>
+                    
+                    <div class="insights-row">
+                      <div class="insight-metric">
+                        <span class="insight-label">{{ tr('Top Video') }}</span>
+                        <span class="insight-value text-ellipsis" :title="topPerformingVideo?.title || '-'">
+                          {{ topPerformingVideo ? truncateText(topPerformingVideo.title, 25) : '-' }}
+                        </span>
+                        <span class="insight-sub" v-if="topPerformingVideo">
+                          {{ formatNumber(topPerformingVideo.viewCount) }} {{ tr('views') }}
+                        </span>
+                      </div>
+                      
+                      <div class="insight-metric">
+                        <span class="insight-label">{{ tr('Avg. Engagement') }}</span>
+                        <span class="insight-value">{{ averageEngagementRate }}%</span>
+                        <span class="insight-sub">{{ tr('Likes + comments per view') }}</span>
+                      </div>
+                    </div>
+                    
+                    <!-- Dynamic Explanation -->
+                    <div class="explanation-box">
+                      <div class="explanation-icon">💡</div>
+                      <div class="explanation-text">
+                        <p class="explanation-header">{{ tr('How to Read the Chart') }}</p>
+                        <p class="explanation-desc">{{ getChartInterpretation() }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Recent Uploads grid list -->
+                <div class="list-section-header" style="margin: var(--sp-6) 0 var(--sp-3); border-bottom: 1px solid var(--edge); padding-bottom: var(--sp-2);">
+                  <h3 style="font-size: var(--sp-4); font-weight: 700; color: var(--ink-primary);">{{ tr('Recent Uploads') }}</h3>
+                </div>
+                <div class="youtube-videos-grid">
+                  <div v-for="video in youtubeVideos" :key="video.id" class="yt-video-card">
+                    <div class="yt-thumb-wrap">
+                      <img :src="video.thumbnails?.medium?.url" class="yt-thumb" alt="Thumbnail" />
+                      <span v-if="video.privacyStatus" class="yt-status-badge" :class="[video.privacyStatus, video.publishAt ? 'scheduled' : '']">
+                        {{ getPrivacyStatusLabel(video) }}
+                      </span>
+                      <a :href="'https://youtube.com/watch?v=' + video.id" target="_blank" class="yt-play-btn">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                      </a>
+                    </div>
+                    <div class="yt-card-body">
+                      <h4 class="yt-video-title" :title="video.title">{{ video.title }}</h4>
+                      <p class="yt-video-date">{{ formatDate(video.publishedAt) }}</p>
+                      
+                      <div class="yt-video-stats">
+                        <div class="yt-stat" :title="tr('Views')">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                          </svg>
+                          <span>{{ formatNumber(video.viewCount) }}</span>
+                        </div>
+                        <div class="yt-stat" :title="tr('Likes')">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+                          </svg>
+                          <span>{{ formatNumber(video.likeCount) }}</span>
+                        </div>
+                        <div class="yt-stat" :title="tr('Comments')">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                          </svg>
+                          <span>{{ formatNumber(video.commentCount) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Subtab Content: YouTube Trends -->
+            <div v-else-if="activeYoutubeSubTab === 'trends'" class="subtab-content">
+              <div class="trends-header">
+                <div class="field" style="margin-bottom: 0; display: flex; align-items: center; gap: var(--sp-3);">
+                  <label class="field-label" style="margin-bottom: 0; font-weight: 500;">{{ tr('Trending Region') }}</label>
+                  <select 
+                    v-model="selectedTrendsRegion" 
+                    class="control select" 
+                    style="width: 160px;" 
+                    @change="loadYoutubeTrends"
+                  >
+                    <option v-for="r in regions" :key="r.code" :value="r.code">{{ r.name }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div v-if="loadingYoutubeTrends" class="loading-state" style="padding: var(--sp-6) 0;">
+                <span class="spinner"></span>
+                <span class="loading-text">{{ tr('Loading trending videos...') }}</span>
+              </div>
+              <div v-else-if="youtubeTrends.length === 0" class="empty-state" style="padding: var(--sp-6) 0;">
+                <p class="empty-desc">{{ tr('No trending videos found.') }}</p>
+              </div>
+              <div v-else class="youtube-videos-grid">
+                <div v-for="video in youtubeTrends" :key="video.id" class="yt-video-card">
+                  <div class="yt-thumb-wrap">
+                    <img :src="video.thumbnails?.medium?.url" class="yt-thumb" alt="Thumbnail" />
+                    <a :href="'https://youtube.com/watch?v=' + video.id" target="_blank" class="yt-play-btn">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                      </svg>
+                    </a>
+                  </div>
+                  <div class="yt-card-body">
+                    <h4 class="yt-video-title" :title="video.title">{{ video.title }}</h4>
+                    <p class="yt-video-channel">{{ video.channelTitle }}</p>
+                    <p class="yt-video-date">{{ formatDate(video.publishedAt) }}</p>
+                    
+                    <div class="yt-video-stats">
+                      <div class="yt-stat" :title="tr('Views')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                          <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                        <span>{{ formatNumber(video.viewCount) }}</span>
+                      </div>
+                      <div class="yt-stat" :title="tr('Likes')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+                        </svg>
+                        <span>{{ formatNumber(video.likeCount) }}</span>
+                      </div>
+                      <div class="yt-stat" :title="tr('Comments')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                        </svg>
+                        <span>{{ formatNumber(video.commentCount) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Subtab Content: Lookup Video -->
+            <div v-else-if="activeYoutubeSubTab === 'search'" class="subtab-content">
+              <div class="search-bar-wrap">
+                <div class="hero-field">
+                  <input
+                    v-model="searchVideoQuery"
+                    type="text"
+                    class="hero-text"
+                    :placeholder="tr('Enter YouTube Video URL or Video ID (e.g. https://www.youtube.com/watch?v=...)')"
+                    @keyup.enter="searchYoutubeVideo"
+                  />
+                  <button 
+                    class="btn-hero" 
+                    :disabled="loadingSearchVideo || !searchVideoQuery" 
+                    @click="searchYoutubeVideo"
+                  >
+                    <span v-if="loadingSearchVideo" class="spinner"></span>
+                    <template v-else>{{ tr('Lookup') }}</template>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Search Error -->
+              <div v-if="searchError" class="search-error-box">
+                {{ searchError }}
+              </div>
+
+              <!-- Searched Video Card Details -->
+              <div v-if="searchedVideoResult" class="searched-video-result">
+                <div class="yt-video-card detail-view">
+                  <div class="yt-thumb-wrap">
+                    <img :src="searchedVideoResult.thumbnails?.high?.url || searchedVideoResult.thumbnails?.medium?.url" class="yt-thumb" alt="Thumbnail" />
+                    <span v-if="searchedVideoResult.privacyStatus" class="yt-status-badge" :class="[searchedVideoResult.privacyStatus, searchedVideoResult.publishAt ? 'scheduled' : '']">
+                      {{ getPrivacyStatusLabel(searchedVideoResult) }}
+                    </span>
+                    <a :href="'https://youtube.com/watch?v=' + searchedVideoResult.id" target="_blank" class="yt-play-btn large">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                      </svg>
+                    </a>
+                  </div>
+                  <div class="yt-card-body">
+                    <h3 class="yt-video-title-large">{{ searchedVideoResult.title }}</h3>
+                    <p class="yt-video-channel" style="font-size: var(--sp-4);">{{ searchedVideoResult.channelTitle }}</p>
+                    <p class="yt-video-date">{{ formatDate(searchedVideoResult.publishedAt) }}</p>
+                    
+                    <div class="yt-video-stats large-stats">
+                      <div class="yt-stat-large">
+                        <span class="stat-icon">👁️</span>
+                        <div class="stat-text">
+                          <span class="stat-value">{{ formatNumber(searchedVideoResult.viewCount) }}</span>
+                          <span class="stat-name">{{ tr('Views') }}</span>
+                        </div>
+                      </div>
+                      <div class="yt-stat-large">
+                        <span class="stat-icon">👍</span>
+                        <div class="stat-text">
+                          <span class="stat-value">{{ formatNumber(searchedVideoResult.likeCount) }}</span>
+                          <span class="stat-name">{{ tr('Likes') }}</span>
+                        </div>
+                      </div>
+                      <div class="yt-stat-large">
+                        <span class="stat-icon">💬</span>
+                        <div class="stat-text">
+                          <span class="stat-value">{{ formatNumber(searchedVideoResult.commentCount) }}</span>
+                          <span class="stat-name">{{ tr('Comments') }}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div v-if="searchedVideoResult.description" class="yt-video-desc-box">
+                      <p class="desc-title">{{ tr('Description') }}</p>
+                      <pre class="desc-text">{{ searchedVideoResult.description }}</pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
     </main>
 
     <!-- Modal for Logs -->
@@ -873,7 +1309,297 @@ const voices = ref<{ id: string; name: string }[]>([])
 const fonts = ref<string[]>([])
 const activeTask = ref<any>(null)
 const taskLog = ref('')
-const activeTab = ref<'create' | 'tasks' | 'settings'>('create')
+const activeTab = ref<'create' | 'tasks' | 'settings' | 'youtube'>('create')
+
+// YouTube stats & trends state
+const activeYoutubeSubTab = ref<'my-videos' | 'trends' | 'search'>('my-videos')
+const youtubeStatus = ref<any>(null)
+const loadingYoutubeStatus = ref(false)
+const youtubeVideos = ref<any[]>([])
+const loadingYoutubeVideos = ref(false)
+const youtubeTrends = ref<any[]>([])
+const loadingYoutubeTrends = ref(false)
+const selectedTrendsRegion = ref('US')
+const searchVideoQuery = ref('')
+const searchedVideoResult = ref<any>(null)
+const loadingSearchVideo = ref(false)
+const searchError = ref('')
+
+const selectedChartMetric = ref<'views' | 'likes' | 'comments'>('views')
+const hoveredPoint = ref<any>(null)
+
+const chartPoints = computed(() => {
+  if (!youtubeVideos.value || youtubeVideos.value.length === 0) return []
+  const vids = [...youtubeVideos.value].reverse()
+  const metric = selectedChartMetric.value
+  
+  const values = vids.map(v => {
+    const valStr = metric === 'views' ? v.viewCount : (metric === 'likes' ? v.likeCount : v.commentCount)
+    return parseInt(valStr, 10) || 0
+  })
+  
+  const maxVal = Math.max(...values, 1)
+  const minVal = 0
+  const range = maxVal - minVal
+  
+  const width = 600
+  const height = 220
+  const paddingLeft = 35
+  const paddingRight = 35
+  const paddingTop = 30
+  const paddingBottom = 40
+  
+  const usableWidth = width - paddingLeft - paddingRight
+  const usableHeight = height - paddingTop - paddingBottom
+  
+  return vids.map((video, idx) => {
+    const val = values[idx]
+    const x = vids.length > 1 
+      ? paddingLeft + (idx * usableWidth) / (vids.length - 1)
+      : width / 2
+    const y = height - paddingBottom - ((val - minVal) / range) * usableHeight
+    return {
+      x,
+      y,
+      value: val,
+      video
+    }
+  })
+})
+
+const chartPaths = computed(() => {
+  const pts = chartPoints.value
+  if (pts.length === 0) {
+    return { linePath: '', areaPath: '' }
+  }
+  
+  let linePath = `M ${pts[0].x} ${pts[0].y}`
+  for (let i = 1; i < pts.length; i++) {
+    linePath += ` L ${pts[i].x} ${pts[i].y}`
+  }
+  
+  const startX = pts[0].x
+  const endX = pts[pts.length - 1].x
+  const bottomY = 180
+  
+  const areaPath = `${linePath} L ${endX} ${bottomY} L ${startX} ${bottomY} Z`
+  
+  return { linePath, areaPath }
+})
+
+const topPerformingVideo = computed(() => {
+  if (!youtubeVideos.value || youtubeVideos.value.length === 0) return null
+  return [...youtubeVideos.value].reduce((prev, current) => {
+    const prevViews = parseInt(prev.viewCount, 10) || 0
+    const currViews = parseInt(current.viewCount, 10) || 0
+    return currViews > prevViews ? current : prev
+  })
+})
+
+const averageEngagementRate = computed(() => {
+  if (!youtubeVideos.value || youtubeVideos.value.length === 0) return '0.0'
+  let totalViews = 0
+  let totalEngagement = 0
+  youtubeVideos.value.forEach(v => {
+    const views = parseInt(v.viewCount, 10) || 0
+    const likes = parseInt(v.likeCount, 10) || 0
+    const comments = parseInt(v.commentCount, 10) || 0
+    totalViews += views
+    totalEngagement += (likes + comments)
+  })
+  if (totalViews === 0) return '0.0'
+  return ((totalEngagement / totalViews) * 100).toFixed(1)
+})
+
+function getChartInterpretation(): string {
+  const isIndonesian = locale.value === 'id'
+  if (!youtubeVideos.value || youtubeVideos.value.length === 0) {
+    return isIndonesian 
+      ? 'Belum ada data untuk ditampilkan. Unggah video terlebih dahulu.'
+      : 'No data to display. Please upload videos first.'
+  }
+  
+  const metric = selectedChartMetric.value
+  const pts = chartPoints.value
+  if (pts.length < 2) {
+    return isIndonesian
+      ? 'Grafik memerlukan minimal 2 video untuk menunjukkan tren.'
+      : 'The chart requires at least 2 videos to show a trend.'
+  }
+  
+  const lastVal = pts[pts.length - 1].value
+  const avgVal = pts.reduce((sum, pt) => sum + pt.value, 0) / pts.length
+  
+  let trendDirection = ''
+  if (lastVal > avgVal * 1.15) {
+    trendDirection = isIndonesian 
+      ? 'meningkat pesat dibanding rata-rata' 
+      : 'increased significantly compared to the average'
+  } else if (lastVal < avgVal * 0.85) {
+    trendDirection = isIndonesian
+      ? 'menurun dari rata-rata'
+      : 'decreased below the average'
+  } else {
+    trendDirection = isIndonesian
+      ? 'stabil mendekati rata-rata'
+      : 'stable close to the average'
+  }
+  
+  const metricName = isIndonesian 
+    ? (metric === 'views' ? 'penayangan' : (metric === 'likes' ? 'suka' : 'komentar'))
+    : (metric === 'views' ? 'views' : (metric === 'likes' ? 'likes' : 'comments'))
+  
+  return isIndonesian
+    ? `Grafik menunjukkan performa video Anda berdasarkan urutan rilis (kiri = terlama, kanan = terbaru). Saat ini, tren ${metricName} untuk video terbaru Anda terpantau ${trendDirection}. Arahkan kursor ke titik grafik untuk info detail.`
+    : `The chart displays video performance chronologically (left = oldest, right = newest). Currently, the ${metricName} trend for your latest video is ${trendDirection}. Hover over any point to inspect individual video statistics.`
+}
+
+
+const regions = [
+  { code: 'US', name: 'United States' },
+  { code: 'ID', name: 'Indonesia' },
+  { code: 'IN', name: 'India' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'KR', name: 'South Korea' }
+]
+
+async function loadYoutubeStatus() {
+  loadingYoutubeStatus.value = true
+  try {
+    const res = await api.getYoutubeStatus()
+    if (res && res.data) {
+      youtubeStatus.value = res.data
+    } else {
+      youtubeStatus.value = { success: false, error: 'Failed to retrieve channel status' }
+    }
+  } catch (err: any) {
+    youtubeStatus.value = { success: false, error: err.message || 'Connection error' }
+  } finally {
+    loadingYoutubeStatus.value = false
+  }
+}
+
+async function loadYoutubeVideos() {
+  loadingYoutubeVideos.value = true
+  try {
+    const res = await api.getYoutubeVideos(20)
+    if (res && res.data && res.data.success) {
+      youtubeVideos.value = res.data.videos || []
+    } else {
+      youtubeVideos.value = []
+    }
+  } catch (err) {
+    youtubeVideos.value = []
+  } finally {
+    loadingYoutubeVideos.value = false
+  }
+}
+
+async function loadYoutubeTrends() {
+  loadingYoutubeTrends.value = true
+  try {
+    const res = await api.getYoutubeTrends(selectedTrendsRegion.value, 15)
+    if (res && res.data && res.data.success) {
+      youtubeTrends.value = res.data.videos || []
+    } else {
+      youtubeTrends.value = []
+    }
+  } catch (err) {
+    youtubeTrends.value = []
+  } finally {
+    loadingYoutubeTrends.value = false
+  }
+}
+
+function extractYoutubeVideoId(urlOrId: string): string | null {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/
+  const match = urlOrId.match(regExp)
+  if (match && match[2].length === 11) {
+    return match[2]
+  }
+  const cleanId = urlOrId.trim()
+  if (cleanId.length === 11) {
+    return cleanId
+  }
+  return null
+}
+
+async function searchYoutubeVideo() {
+  searchError.value = ''
+  searchedVideoResult.value = null
+  const videoId = extractYoutubeVideoId(searchVideoQuery.value)
+  if (!videoId) {
+    searchError.value = tr('Invalid YouTube Video URL or Video ID')
+    return
+  }
+  loadingSearchVideo.value = true
+  try {
+    const res = await api.getYoutubeVideoStats(videoId)
+    if (res && res.data && res.data.success) {
+      searchedVideoResult.value = res.data.video
+    } else {
+      searchError.value = res?.data?.error || tr('Video not found or is private')
+    }
+  } catch (err: any) {
+    searchError.value = err.message || tr('Error fetching video statistics')
+  } finally {
+    loadingSearchVideo.value = false
+  }
+}
+
+async function loadYoutubeData() {
+  await loadYoutubeStatus()
+  if (youtubeStatus.value && youtubeStatus.value.success) {
+    if (activeYoutubeSubTab.value === 'my-videos') {
+      await loadYoutubeVideos()
+    } else if (activeYoutubeSubTab.value === 'trends') {
+      await loadYoutubeTrends()
+    }
+  }
+}
+
+function formatNumber(num: any): string {
+  if (num === undefined || num === null) return '0'
+  const val = typeof num === 'string' ? parseInt(num, 10) : num
+  if (isNaN(val)) return '0'
+  if (val >= 1000000) {
+    return (val / 1000000).toFixed(1) + 'M'
+  }
+  if (val >= 1000) {
+    return (val / 1000).toFixed(1) + 'K'
+  }
+  return val.toString()
+}
+
+function formatDate(dateStr: string): string {
+  if (!dateStr) return ''
+  try {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch {
+    return dateStr
+  }
+}
+
+function getPrivacyStatusLabel(video: any): string {
+  if (video.publishAt) {
+    return tr('Scheduled')
+  }
+  if (video.privacyStatus === 'public') {
+    return tr('Published')
+  }
+  if (video.privacyStatus === 'private') {
+    return tr('Private')
+  }
+  if (video.privacyStatus === 'unlisted') {
+    return tr('Unlisted')
+  }
+  return video.privacyStatus || ''
+}
 
 // Tasks tab state
 const tasks = ref<any[]>([])
@@ -1258,6 +1984,18 @@ function truncateText(text: string, maxLen: number) {
 watch(activeTab, (newTab) => {
   if (newTab === 'tasks') {
     loadTasks()
+  } else if (newTab === 'youtube') {
+    loadYoutubeData()
+  }
+})
+
+watch(activeYoutubeSubTab, (newSubTab) => {
+  if (activeTab.value === 'youtube' && youtubeStatus.value?.success) {
+    if (newSubTab === 'my-videos') {
+      loadYoutubeVideos()
+    } else if (newSubTab === 'trends') {
+      loadYoutubeTrends()
+    }
   }
 })
 
@@ -2282,5 +3020,663 @@ select.control { cursor: pointer; }
 .btn-preview-voice:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* === YOUTUBE DASHBOARD STYLES === */
+.youtube-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.channel-card {
+  background: var(--surface-1);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-6);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.channel-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.channel-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid var(--brand);
+  background: var(--surface-3);
+  object-fit: cover;
+}
+
+.channel-avatar-placeholder {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid var(--brand);
+  background: var(--surface-3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--brand);
+}
+
+.channel-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.channel-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink-primary);
+  line-height: 1.2;
+}
+
+.channel-handle {
+  font-size: 13px;
+  color: var(--ink-secondary);
+}
+
+.channel-stats-row {
+  display: flex;
+  gap: var(--sp-6);
+}
+
+.channel-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-num {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--brand);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-tertiary);
+  margin-top: var(--sp-1);
+}
+
+.youtube-subtabs {
+  display: flex;
+  border-bottom: 1px solid var(--edge);
+  gap: var(--sp-4);
+}
+
+.subtab-btn {
+  background: none;
+  border: none;
+  padding: var(--sp-3) var(--sp-1);
+  color: var(--ink-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.subtab-btn:hover {
+  color: var(--ink-primary);
+}
+
+.subtab-btn.active {
+  color: var(--brand);
+}
+
+.subtab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--brand);
+  border-radius: 1px;
+}
+
+.subtab-content {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.youtube-videos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--sp-4);
+}
+
+.yt-video-card {
+  background: var(--surface-1);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: transform var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out);
+}
+
+.yt-video-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--edge-strong);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
+.yt-thumb-wrap {
+  position: relative;
+  aspect-ratio: 16/9;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.yt-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+.yt-video-card:hover .yt-thumb {
+  transform: scale(1.03);
+}
+
+.yt-play-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  background: rgba(232, 178, 80, 0.9);
+  color: #0c0d11;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+}
+
+.yt-play-btn svg {
+  margin-left: 2px;
+}
+
+.yt-thumb-wrap:hover .yt-play-btn {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.yt-play-btn:hover {
+  background: var(--brand-hover);
+  transform: translate(-50%, -50%) scale(1.05) !important;
+}
+
+.yt-card-body {
+  padding: var(--sp-4);
+}
+
+.yt-video-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  height: 40px;
+  line-height: 1.4;
+  margin-bottom: var(--sp-1);
+}
+
+.yt-video-title-large {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink-primary);
+  margin-bottom: var(--sp-2);
+  line-height: 1.3;
+}
+
+.yt-video-channel {
+  font-size: 12px;
+  color: var(--brand);
+  font-weight: 500;
+  margin-bottom: var(--sp-1);
+}
+
+.yt-video-date {
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  margin-bottom: var(--sp-3);
+}
+
+.yt-video-stats {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--edge);
+  padding-top: var(--sp-3);
+}
+
+.yt-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--ink-secondary);
+  font-size: 12px;
+}
+
+.yt-stat svg {
+  color: var(--ink-tertiary);
+}
+
+.trends-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--sp-4);
+}
+
+.search-bar-wrap {
+  margin-bottom: var(--sp-6);
+  max-width: 680px;
+}
+
+.search-error-box {
+  background: var(--danger-muted);
+  border: 1px solid var(--danger);
+  color: var(--ink-primary);
+  border-radius: var(--radius-md);
+  padding: var(--sp-3) var(--sp-4);
+  font-size: 13px;
+  margin-bottom: var(--sp-6);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.searched-video-result {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.yt-video-card.detail-view {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 0;
+}
+
+@media (max-width: 768px) {
+  .yt-video-card.detail-view {
+    grid-template-columns: 1fr;
+  }
+}
+
+.yt-video-card.detail-view .yt-thumb-wrap {
+  aspect-ratio: 16/9;
+  height: 100%;
+}
+
+.yt-play-btn.large {
+  width: 64px;
+  height: 64px;
+  opacity: 0.85;
+}
+
+.yt-play-btn.large svg {
+  margin-left: 4px;
+  width: 28px;
+  height: 28px;
+}
+
+.large-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-3);
+  margin: var(--sp-4) 0;
+  border: none;
+  padding: 0;
+}
+
+.yt-stat-large {
+  background: var(--surface-2);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-3);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.yt-stat-large .stat-icon {
+  font-size: 24px;
+}
+
+.yt-stat-large .stat-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.yt-stat-large .stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-primary);
+  line-height: 1.2;
+}
+
+.yt-stat-large .stat-name {
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  text-transform: uppercase;
+}
+
+.yt-video-desc-box {
+  background: var(--surface-2);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-3);
+  margin-top: var(--sp-4);
+}
+
+.yt-video-desc-box .desc-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--brand);
+  margin-bottom: var(--sp-2);
+}
+
+.yt-video-desc-box .desc-text {
+  font-size: 12px;
+  color: var(--ink-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 160px;
+  overflow-y: auto;
+  font-family: inherit;
+}
+
+.yt-status-badge {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  padding: 2px var(--sp-2);
+  border-radius: var(--radius-xs);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  z-index: 10;
+  backdrop-filter: blur(4px);
+}
+
+.yt-status-badge.public {
+  background: rgba(62, 201, 122, 0.85); /* success */
+  color: #edeef0;
+}
+
+.yt-status-badge.private {
+  background: rgba(232, 84, 84, 0.85); /* danger */
+  color: #edeef0;
+}
+
+.yt-status-badge.unlisted {
+  background: rgba(232, 168, 64, 0.85); /* warning */
+  color: #edeef0;
+}
+
+.yt-status-badge.scheduled {
+  background: rgba(232, 178, 80, 0.85); /* brand */
+  color: #0c0d11;
+}
+
+.analytics-section {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-6);
+}
+
+@media (max-width: 1024px) {
+  .analytics-section {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-card {
+  background: var(--surface-1);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-md);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--sp-4);
+}
+
+.chart-title {
+  font-size: var(--sp-4);
+  font-weight: 700;
+  color: var(--ink-primary);
+}
+
+.metric-selector {
+  display: flex;
+  background: var(--surface-2);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+
+.metric-btn {
+  border: none;
+  background: transparent;
+  color: var(--ink-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.metric-btn:hover {
+  color: var(--ink-primary);
+}
+
+.metric-btn.active {
+  background: var(--brand);
+  color: #0c0d11;
+}
+
+.svg-chart-container {
+  position: relative;
+  width: 100%;
+  height: 220px;
+}
+
+.trend-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.chart-node {
+  cursor: pointer;
+  transition: r var(--duration-fast) var(--ease-out), fill var(--duration-fast) var(--ease-out);
+}
+
+.chart-node:hover {
+  r: 8px;
+}
+
+.chart-tooltip-display {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  background: var(--surface-2);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-3);
+  margin-top: var(--sp-4);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.tooltip-thumb {
+  width: 64px;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  border-radius: var(--radius-xs);
+  flex-shrink: 0;
+}
+
+.tooltip-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex-grow: 1;
+}
+
+.tooltip-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.tooltip-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--ink-tertiary);
+}
+
+.tooltip-value {
+  color: var(--brand);
+}
+
+.chart-tooltip-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  font-size: 12px;
+  color: var(--ink-tertiary);
+  border: 1px dashed var(--edge);
+  border-radius: var(--radius-sm);
+  margin-top: var(--sp-4);
+}
+
+.insights-card {
+  background: var(--surface-1);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-md);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+}
+
+.insights-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-tertiary);
+  margin-bottom: var(--sp-4);
+}
+
+.insights-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.insight-metric {
+  background: var(--surface-2);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.insight-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--ink-tertiary);
+  letter-spacing: 0.02em;
+}
+
+.insight-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-primary);
+  margin-top: 2px;
+}
+
+.insight-sub {
+  font-size: 11px;
+  color: var(--brand);
+  margin-top: 2px;
+}
+
+.explanation-box {
+  background: rgba(232, 178, 80, 0.06);
+  border: 1px solid rgba(232, 178, 80, 0.2);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-3);
+  display: flex;
+  gap: var(--sp-2.5);
+  flex-grow: 1;
+}
+
+.explanation-icon {
+  font-size: var(--sp-5);
+  line-height: 1;
+}
+
+.explanation-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.explanation-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand);
+  margin-bottom: 2px;
+}
+
+.explanation-desc {
+  font-size: 11px;
+  color: var(--ink-secondary);
+  line-height: 1.4;
 }
 </style>
