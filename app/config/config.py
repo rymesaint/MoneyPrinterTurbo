@@ -152,6 +152,7 @@ def save_config():
         _cfg["app"] = app
         _cfg["azure"] = azure
         _cfg["siliconflow"] = siliconflow
+        _cfg["elevenlabs"] = elevenlabs
         _cfg["ui"] = ui
         _cfg["discord"] = discord
         _cfg["youtube"] = youtube
@@ -165,6 +166,7 @@ whisper = _cfg.get("whisper", {})
 proxy = _cfg.get("proxy", {})
 azure = _cfg.get("azure", {})
 siliconflow = _cfg.get("siliconflow", {})
+elevenlabs = _cfg.get("elevenlabs", {})
 ui = _cfg.get(
     "ui",
     {

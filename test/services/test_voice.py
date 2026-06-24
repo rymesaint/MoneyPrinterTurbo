@@ -733,6 +733,97 @@ class TestVoiceService(unittest.TestCase):
         self.assertEqual(vs.convert_rate_to_percent(1.5), "+50%")
         self.assertEqual(vs.convert_rate_to_percent(0.8), "-20%")
 
+    def test_is_elevenlabs_voice(self):
+        self.assertTrue(vs.is_elevenlabs_voice("elevenlabs:21m00Tcm4TlvDq8ikWAM-Female"))
+        self.assertFalse(vs.is_elevenlabs_voice("azure:en-US-JennyNeural"))
+        self.assertFalse(vs.is_elevenlabs_voice(""))
+        self.assertFalse(vs.is_elevenlabs_voice(None))
+
+    def test_get_elevenlabs_voices_fallback(self):
+        with patch.object(vs, "config") as mock_config:
+            mock_config.elevenlabs = {"api_key": ""}
+            voices = vs.get_elevenlabs_voices()
+            self.assertTrue(len(voices) > 0)
+            self.assertTrue(all(v.startswith("elevenlabs:") for v in voices))
+
+    def test_get_elevenlabs_voices_success(self):
+        fake_response = SimpleNamespace(
+            status_code=200,
+            json=lambda: {
+                "voices": [
+                    {
+                        "voice_id": "test_id_1",
+                        "name": "TestVoice",
+                        "labels": {"gender": "female"}
+                    }
+                ]
+            }
+        )
+        with patch.object(vs, "config") as mock_config, patch.object(vs.requests, "get", return_value=fake_response):
+            mock_config.elevenlabs = {"api_key": "fake_key"}
+            voices = vs.get_elevenlabs_voices()
+            self.assertEqual(voices, ["elevenlabs:test_id_1:TestVoice-Female"])
+
+    def test_elevenlabs_tts_success(self):
+        fake_audio_content = b"fake mp3 audio data"
+        fake_response = SimpleNamespace(
+            status_code=200,
+            content=fake_audio_content
+        )
+        
+        class MockAudioSegment:
+            def __len__(self):
+                return 2000
+            def export(self, *args, **kwargs):
+                return None
+            def apply_gain(self, gain):
+                return self
+
+        mock_sound = MockAudioSegment()
+
+        with tempfile.TemporaryDirectory() as tmp_dir, \
+             patch.object(vs, "config") as mock_config, \
+             patch.object(vs.requests, "post", return_value=fake_response), \
+             patch("pydub.AudioSegment.from_file", return_value=mock_sound):
+            
+            mock_config.elevenlabs = {"api_key": "fake_key"}
+            voice_file = str(Path(tmp_dir) / "elevenlabs_test.mp3")
+            
+            sub_maker = vs.elevenlabs_tts(
+                text="Hello world.",
+                voice_id="test_id_1",
+                voice_rate=1.0,
+                voice_file=voice_file,
+                voice_volume=1.0
+            )
+            
+            self.assertIsNotNone(sub_maker)
+            self.assertEqual(getattr(sub_maker, "subs", []), ["Hello world"])
+            self.assertEqual(len(getattr(sub_maker, "offset", [])), 1)
+
+    def test_elevenlabs_tts_fallback(self):
+        # When ElevenLabs fails (returns None), it should fallback to azure_tts_v1.
+        # We mock elevenlabs_tts to return None and check if azure_tts_v1 gets called.
+        fake_submaker = SimpleNamespace(
+            subs=["Hello world"],
+            offset=[(0, 20000000)]
+        )
+        with patch.object(vs, "elevenlabs_tts", return_value=None) as mock_el_tts, \
+             patch.object(vs, "azure_tts_v1", return_value=fake_submaker) as mock_azure_v1:
+             
+             sub_maker = vs.tts(
+                 text="Hello world.",
+                 voice_name="elevenlabs:test_id_1:Rachel-Female",
+                 voice_rate=1.0,
+                 voice_file="/tmp/dummy.mp3",
+                 voice_volume=1.0
+             )
+             
+             mock_el_tts.assert_called_once()
+             mock_azure_v1.assert_called_once_with("Hello world.", "en-US-JennyNeural", 1.0, "/tmp/dummy.mp3")
+             self.assertIs(sub_maker, fake_submaker)
+
+
 
 if __name__ == "__main__":
     # python -m unittest test.services.test_voice.TestVoiceService.test_azure_tts_v1

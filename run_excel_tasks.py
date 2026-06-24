@@ -200,8 +200,8 @@ def run_schedule(csv_path, youtube_schedule=False):
                 max_uploads = config.youtube.get("max_uploads_per_day", 5)
                 uploads_today = get_youtube_uploads_count_today()
                 if uploads_today >= max_uploads:
-                    logger.warning(f"Daily YouTube upload limit reached ({uploads_today}/{max_uploads}). Skipping task ID {row.get('id')} to prevent API quota/spam ban.")
-                    continue
+                    logger.warning(f"Daily YouTube upload limit reached ({uploads_today}/{max_uploads}). Exiting program to prevent API quota/spam ban.")
+                    sys.exit(0)
 
             # Mark running immediately & save to prevent race condition
             row["status"] = "running"

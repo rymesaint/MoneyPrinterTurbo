@@ -18,6 +18,7 @@ class ConfigUpdateRequest(BaseModel):
     app: Dict[str, Any]
     azure: Dict[str, Any]
     siliconflow: Dict[str, Any]
+    elevenlabs: Dict[str, Any]
     ui: Dict[str, Any]
     discord: Dict[str, Any]
     youtube: Dict[str, Any]
@@ -29,6 +30,7 @@ def get_config():
         "app": config.app,
         "azure": config.azure,
         "siliconflow": config.siliconflow,
+        "elevenlabs": config.elevenlabs,
         "ui": config.ui,
         "discord": config.discord,
         "youtube": config.youtube,
@@ -40,6 +42,7 @@ def update_config(body: ConfigUpdateRequest):
     config.app.update(body.app)
     config.azure.update(body.azure)
     config.siliconflow.update(body.siliconflow)
+    config.elevenlabs.update(body.elevenlabs)
     config.ui.update(body.ui)
     config.discord.update(body.discord)
     config.youtube.update(body.youtube)
@@ -69,6 +72,8 @@ def get_voices(tts_server: str = "azure-tts-v1"):
         filtered_voices = voice.get_gemini_voices()
     elif tts_server == "mimo-tts":
         filtered_voices = voice.get_mimo_voices()
+    elif tts_server == "elevenlabs":
+        filtered_voices = voice.get_elevenlabs_voices()
     else:
         # Default Azure
         all_voices = voice.get_all_azure_voices(filter_locals=None)
@@ -83,7 +88,15 @@ def get_voices(tts_server: str = "azure-tts-v1"):
     # Map to friendly names
     result = []
     for v in filtered_voices:
-        friendly = v.replace("Female", "Female").replace("Male", "Male").replace("Neural", "")
+        if tts_server == "elevenlabs":
+            parts = v.split(":")
+            if len(parts) >= 3:
+                name_gender = parts[2]
+                friendly = name_gender.replace("-", " (") + ")"
+            else:
+                friendly = v
+        else:
+            friendly = v.replace("Female", "Female").replace("Male", "Male").replace("Neural", "")
         result.append({
             "id": v,
             "name": friendly

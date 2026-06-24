@@ -200,13 +200,32 @@
                   <option value="siliconflow">{{ tr('SiliconFlow') }}</option>
                   <option value="gemini-tts">{{ tr('Gemini TTS') }}</option>
                   <option value="mimo-tts">{{ tr('MiMo TTS') }}</option>
+                  <option value="elevenlabs">{{ tr('ElevenLabs') }}</option>
                 </select>
               </div>
               <div class="field" v-if="form.tts_server !== 'no-voice'">
                 <label class="field-label">{{ tr('Voice') }}</label>
-                <select v-model="form.voice_name" class="control select">
-                  <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}</option>
-                </select>
+                <div style="display: flex; gap: var(--sp-2);">
+                  <select v-model="form.voice_name" class="control select" style="flex: 1;">
+                    <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}</option>
+                  </select>
+                  <button
+                    class="btn-preview-voice"
+                    @click="playVoicePreview"
+                    :disabled="previewingVoice || !form.voice_name"
+                    style="flex-shrink: 0;"
+                  >
+                    <span v-if="previewingVoice" class="spinner" style="width: 14px; height: 14px;"></span>
+                    <template v-else>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                      </svg>
+                      {{ tr('Listen') }}
+                    </template>
+                  </button>
+                </div>
               </div>
               <div class="field-group" v-if="form.tts_server !== 'no-voice'">
                 <div class="field">
@@ -755,6 +774,11 @@
                 <input v-model="configData.app.material_directory" type="text" class="control input" placeholder="Path to assets folder" />
               </div>
 
+              <div class="field">
+                <label class="field-label">{{ tr('ElevenLabs API Key') }}</label>
+                <input v-model="configData.elevenlabs.api_key" type="password" class="control input" placeholder="ElevenLabs API Key" />
+              </div>
+
               <div class="field" style="margin-top:var(--sp-4)">
                 <label class="field-label">{{ tr('Default Intro Video Path') }}</label>
                 <div class="file-uploader">
@@ -864,6 +888,7 @@ const configData = ref<any>({
   app: {},
   azure: {},
   siliconflow: {},
+  elevenlabs: {},
   ui: {},
   discord: {},
   youtube: {},
@@ -987,6 +1012,52 @@ function removeGlobalIntroFile() {
   globalIntroFileName.value = ''
   if (globalIntroFileInput.value) {
     globalIntroFileInput.value.value = ''
+  }
+}
+
+const previewingVoice = ref(false)
+const previewAudio = ref<HTMLAudioElement | null>(null)
+
+async function playVoicePreview() {
+  if (!form.value.voice_name) return
+  
+  if (previewAudio.value) {
+    previewAudio.value.pause()
+    previewAudio.value = null
+  }
+  
+  previewingVoice.value = true
+  try {
+    const previewText = form.value.video_language === 'zh-CN' || form.value.video_language === 'zh'
+      ? "您好！这是所选声音的测试音频。" 
+      : "Hello! This is a preview of the selected voice."
+      
+    const res = await fetch('/api/v1/voice/preview', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        text: previewText,
+        voice_name: form.value.voice_name,
+        voice_rate: form.value.voice_rate,
+        voice_volume: form.value.voice_volume
+      })
+    })
+    
+    if (res.ok) {
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      previewAudio.value = new Audio(url)
+      previewAudio.value.play()
+    } else {
+      alert(tr('Voice preview failed'))
+    }
+  } catch (err) {
+    console.error(err)
+    alert(tr('Voice preview error'))
+  } finally {
+    previewingVoice.value = false
   }
 }
 
@@ -2187,5 +2258,29 @@ select.control { cursor: pointer; }
 
 .btn-remove-file:hover {
   color: var(--danger);
+}
+
+.btn-preview-voice {
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-xs);
+  color: var(--ink-secondary);
+  padding: 0 var(--sp-3);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  transition: border-color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+}
+.btn-preview-voice:hover:not(:disabled) {
+  border-color: var(--control-border-hover);
+  color: var(--ink-primary);
+  background: var(--surface-2);
+}
+.btn-preview-voice:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
