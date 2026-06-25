@@ -150,6 +150,8 @@
     "OpenAI API Key": "OpenAI API Key",
     "OpenAI Base URL": "OpenAI Base URL",
     "OpenAI Model Name": "OpenAI Model Name",
+    "Kling AI API Key": "Chave API do Kling AI",
+    "Kling AI Model Name": "Nome do Modelo Kling AI",
     "Optional": "Opcional",
     "Page Access Token": "Token de acesso à página",
     "Page ID": "ID da página",

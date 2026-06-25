@@ -1,6 +1,7 @@
 import os
 import random
 import threading
+import time
 from typing import List
 from urllib.parse import urlencode
 
@@ -412,6 +413,102 @@ def save_video(video_url: str, save_dir: str = "") -> str:
     return ""
 
 
+def search_videos_kling(
+    search_term: str,
+    minimum_duration: int,
+    video_aspect: VideoAspect = VideoAspect.portrait,
+) -> List[MaterialInfo]:
+    api_key = config.app.get("kling_api_key")
+    if not api_key:
+        logger.warning("kling_api_key not configured, falling back to pexels")
+        return search_videos_pexels(search_term, minimum_duration, video_aspect)
+
+    aspect = VideoAspect(video_aspect)
+    ratio = aspect.value
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    
+    duration = "5"
+    if minimum_duration > 5:
+        duration = "10"
+
+    model_name = config.app.get("kling_model_name", "kling-v1")
+
+    data = {
+        "prompt": search_term,
+        "ratio": ratio,
+        "duration": duration,
+        "model_name": model_name
+    }
+
+    try:
+        r = requests.post(
+            "https://api.klingai.com/v1/videos/text2video",
+            headers=headers,
+            json=data,
+            proxies=config.proxy,
+            verify=_get_tls_verify(),
+            timeout=(30, 60)
+        )
+        res = r.json()
+        if res.get("code") != 0:
+            logger.error(f"Kling video generation submit failed: {res.get('message')}. Falling back to pexels.")
+            return search_videos_pexels(search_term, minimum_duration, video_aspect)
+        
+        task_id = res.get("data", {}).get("task_id")
+        if not task_id:
+            logger.error("Kling API response did not contain task_id. Falling back to pexels.")
+            return search_videos_pexels(search_term, minimum_duration, video_aspect)
+
+        logger.info(f"Kling video generation task submitted: {task_id}")
+
+        import time
+        max_retries = 60
+        poll_interval = 5
+        video_url = None
+        for i in range(max_retries):
+            time.sleep(poll_interval)
+            status_resp = requests.get(
+                f"https://api.klingai.com/v1/videos/text2video/{task_id}",
+                headers=headers,
+                proxies=config.proxy,
+                verify=_get_tls_verify(),
+                timeout=(30, 60)
+            )
+            status_data = status_resp.json()
+            if status_data.get("code") != 0:
+                logger.error(f"Kling polling error: {status_data.get('message')}")
+                break
+            
+            task_info = status_data.get("data", {})
+            status = task_info.get("task_status")
+            logger.info(f"Kling task {task_id} status: {status}")
+            if status == "SUCCESS":
+                videos = task_info.get("video_result", {}).get("videos", [])
+                if videos:
+                    video_url = videos[0].get("url")
+                break
+            elif status in ["FAILED", "CANCELLED"]:
+                logger.error(f"Kling generation task failed: {task_info.get('task_status_msg')}")
+                break
+
+        if video_url:
+            item = MaterialInfo()
+            item.provider = "kling"
+            item.url = video_url
+            item.duration = int(duration)
+            return [item]
+
+        logger.warning(f"Kling generation failed or timed out for task {task_id}. Falling back to pexels.")
+    except Exception as e:
+        logger.error(f"Kling generation error: {str(e)}. Falling back to pexels.")
+
+    return search_videos_pexels(search_term, minimum_duration, video_aspect)
+
+
 def download_videos(
     task_id: str,
     search_terms: List[str],
@@ -429,6 +526,8 @@ def download_videos(
         search_videos = search_videos_coverr
     elif source == "vecteezy":
         search_videos = search_videos_vecteezy
+    elif source == "kling":
+        search_videos = search_videos_kling
 
     material_directory = config.app.get("material_directory", "").strip()
     if material_directory == "task":

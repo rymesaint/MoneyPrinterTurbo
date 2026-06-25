@@ -150,6 +150,8 @@
     "OpenAI API Key": "OpenAI API Key",
     "OpenAI Base URL": "OpenAI Base URL",
     "OpenAI Model Name": "OpenAI Model Name",
+    "Kling AI API Key": "Kling AI API Anahtarı",
+    "Kling AI Model Name": "Kling AI Model Adı",
     "Optional": "İsteğe bağlı",
     "Page Access Token": "Sayfa Erişim Jetonu",
     "Page ID": "Sayfa Kimliği",

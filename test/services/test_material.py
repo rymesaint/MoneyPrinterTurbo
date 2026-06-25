@@ -426,6 +426,67 @@ class TestCoverrProvider(unittest.TestCase):
         self.assertEqual(result, ["/tmp/coverr-saved.mp4"])
 
 
+class TestKlingVideoSource(unittest.TestCase):
+    def setUp(self):
+        self.original_app_config = dict(config.app)
+        self.original_proxy_config = dict(config.proxy)
+
+    def tearDown(self):
+        config.app.clear()
+        config.app.update(self.original_app_config)
+        config.proxy.clear()
+        config.proxy.update(self.original_proxy_config)
+
+    def test_kling_fallback_when_no_api_key(self):
+        config.app["kling_api_key"] = ""
+        with patch("app.services.material.search_videos_pexels") as pexels_mock:
+            material.search_videos_kling("cat", minimum_duration=5)
+            self.assertEqual(pexels_mock.call_count, 1)
+
+    def test_kling_success(self):
+        config.app["kling_api_key"] = "test-kling-key"
+        
+        post_response = SimpleNamespace(
+            json=lambda: {
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "task_id": "kling-task-123",
+                    "task_status": "SUBMITTED"
+                }
+            }
+        )
+        
+        get_response = SimpleNamespace(
+            json=lambda: {
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "task_id": "kling-task-123",
+                    "task_status": "SUCCESS",
+                    "video_result": {
+                        "videos": [
+                            {
+                                "id": "v1",
+                                "url": "https://example.com/kling.mp4",
+                                "duration": 5
+                            }
+                        ]
+                    }
+                }
+            }
+        )
+
+        with patch("app.services.material.requests.post", return_value=post_response) as mock_post, \
+             patch("app.services.material.requests.get", return_value=get_response) as mock_get, \
+             patch("app.services.material.time.sleep") as mock_sleep:
+            
+            results = material.search_videos_kling("cat", minimum_duration=5)
+            self.assertEqual(len(results), 1)
+            self.assertEqual(results[0].provider, "kling")
+            self.assertEqual(results[0].url, "https://example.com/kling.mp4")
+
+
 class TestCcMixterBgm(unittest.TestCase):
     def test_download_ccmixter_bgm_success(self):
         fake_response = SimpleNamespace(

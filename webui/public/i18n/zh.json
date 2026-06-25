@@ -150,6 +150,8 @@
     "OpenAI API Key": "OpenAI API 密钥",
     "OpenAI Base URL": "OpenAI API 地址",
     "OpenAI Model Name": "OpenAI 模型名称",
+    "Kling AI API Key": "Kling AI API 密钥",
+    "Kling AI Model Name": "Kling AI 模型名称",
     "Optional": "可选",
     "Page Access Token": "主页访问 Token",
     "Page ID": "主页 ID",

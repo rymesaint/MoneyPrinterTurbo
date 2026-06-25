@@ -4,6 +4,10 @@ video_source = "pexels" # "pexels" or "pixabay"
 # Whether to prepend a default intro video path
 intro_video_path = ""
 
+# Kling AI API Key
+kling_api_key = ""
+kling_model_name = "kling-v1"
+
 # 是否隐藏配置面板
 hide_config = false
 

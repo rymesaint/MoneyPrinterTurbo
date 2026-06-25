@@ -150,6 +150,8 @@
     "OpenAI API Key": "OpenAI API Key",
     "OpenAI Base URL": "OpenAI Base URL",
     "OpenAI Model Name": "OpenAI Model Name",
+    "Kling AI API Key": "Kling AI API Key",
+    "Kling AI Model Name": "Tên Model Kling AI",
     "Optional": "Không bắt buộc",
     "Page Access Token": "Mã thông báo truy cập trang",
     "Page ID": "ID trang",

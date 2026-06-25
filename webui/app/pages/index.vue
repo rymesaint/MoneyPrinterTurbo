@@ -128,6 +128,7 @@
                     <option value="pixabay">Pixabay</option>
                     <option value="coverr">Coverr</option>
                     <option value="vecteezy">Vecteezy</option>
+                    <option value="kling">Kling AI</option>
                     <option value="local">{{ tr('Local file') }}</option>
                   </select>
                 </div>
@@ -657,6 +658,20 @@
               <div class="field">
                 <label class="field-label">{{ tr('Vecteezy Account ID') }}</label>
                 <input v-model="configData.app.vecteezy_account_id" type="text" class="control input" placeholder="123456" />
+              </div>
+
+              <div class="field">
+                <label class="field-label">{{ tr('Kling AI API Key') }}</label>
+                <input v-model="configData.app.kling_api_key" type="text" class="control input" placeholder="API Key" />
+              </div>
+
+              <div class="field">
+                <label class="field-label">{{ tr('Kling AI Model Name') }}</label>
+                <select v-model="configData.app.kling_model_name" class="control select">
+                  <option value="kling-v1">kling-v1</option>
+                  <option value="kling-v1-5">kling-v1-5</option>
+                  <option value="kling-v2">kling-v2</option>
+                </select>
               </div>
             </div>
 
