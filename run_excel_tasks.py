@@ -1,3 +1,30 @@
+"""
+MoneyPrinterTurbo Excel/CSV Task Scheduler
+
+Script ini digunakan untuk menjalankan pembuatan video secara otomatis berdasarkan jadwal di CSV.
+This script automates video generation tasks based on a schedule in a CSV file.
+
+Cara Menjalankan / How to Run:
+1. Persiapan / Preparation:
+   Salin tasks_schedule.example.csv menjadi tasks_schedule.csv dan isi datanya.
+   Copy tasks_schedule.example.csv to tasks_schedule.csv and fill in your tasks.
+
+2. Sekali Jalan / Single Run:
+   $ uv run python run_excel_tasks.py
+
+3. Mode Loop / Loop Mode:
+   $ uv run python run_excel_tasks.py --loop --interval 60
+
+4. File CSV Kustom / Custom CSV:
+   $ uv run python run_excel_tasks.py --csv path/to/file.csv
+
+5. Penjadwalan YouTube / YouTube Schedule:
+   $ uv run python run_excel_tasks.py --youtube-schedule
+
+6. Windows Batch:
+   Double-click run_scheduler.bat (logs to scheduler_output.log)
+"""
+
 import os
 import sys
 import csv

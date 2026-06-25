@@ -355,7 +355,7 @@
           <div v-if="taskLog" class="terminal">
             <pre>{{ taskLog }}</pre>
           </div>
-          <div v-if="activeTask.state === 2 && activeTask.videos" class="results">
+          <div v-if="activeTask.state === 1 && activeTask.videos" class="results">
             <div v-for="(vid, i) in activeTask.videos" :key="i" class="result-item">
               <video :src="vid" controls class="result-video"></video>
             </div>
@@ -426,7 +426,7 @@
               </div>
 
               <!-- Progress for in-progress tasks -->
-              <div class="task-card-progress-section" v-if="t.state === 1">
+              <div class="task-card-progress-section" v-if="t.state === 4">
                 <div class="task-card-pct-row">
                   <span>{{ tr('Progress') }}</span>
                   <span class="task-card-pct">{{ t.progress ?? 0 }}%</span>
@@ -437,7 +437,7 @@
               </div>
 
               <!-- Results video preview if completed -->
-              <div v-if="t.state === 2 && t.videos && t.videos.length" class="task-card-video">
+              <div v-if="t.state === 1 && t.videos && t.videos.length" class="task-card-video">
                 <video :src="t.videos[0]" controls class="result-video"></video>
               </div>
             </div>
@@ -1703,22 +1703,22 @@ const form = ref({
 
 const taskBadgeClass = computed(() => {
   if (!activeTask.value) return ''
-  if (activeTask.value.state === 2) return 'badge-success'
-  if (activeTask.value.state === 3) return 'badge-danger'
+  if (activeTask.value.state === 1) return 'badge-success'
+  if (activeTask.value.state === -1) return 'badge-danger'
   return 'badge-processing'
 })
 
 const taskStatusLabel = computed(() => {
   if (!activeTask.value) return ''
-  if (activeTask.value.state === 2) return tr('Complete')
-  if (activeTask.value.state === 3) return tr('Failed')
+  if (activeTask.value.state === 1) return tr('Complete')
+  if (activeTask.value.state === -1) return tr('Failed')
   return tr('Processing')
 })
 
 const taskPctColor = computed(() => {
   if (!activeTask.value) return 'var(--ink-tertiary)'
-  if (activeTask.value.state === 2) return 'var(--success)'
-  if (activeTask.value.state === 3) return 'var(--danger)'
+  if (activeTask.value.state === 1) return 'var(--success)'
+  if (activeTask.value.state === -1) return 'var(--danger)'
   return 'var(--brand)'
 })
 
@@ -1922,7 +1922,7 @@ async function pollTask(taskId: string) {
       const res = await api.getTask(taskId)
       if (res.data) {
         activeTask.value = res.data
-        if (res.data.state === 2 || res.data.state === 3) { isGenerating.value = false; return }
+        if (res.data.state === 1 || res.data.state === -1) { isGenerating.value = false; return }
       }
     } catch { /* ignore */ }
   }
@@ -1931,7 +1931,7 @@ async function pollTask(taskId: string) {
 async function streamLog(taskId: string) {
   for await (const chunk of api.streamTaskLog(taskId)) {
     taskLog.value += chunk
-    if (activeTask.value?.state === 2 || activeTask.value?.state === 3) return
+    if (activeTask.value?.state === 1 || activeTask.value?.state === -1) return
   }
 }
 
@@ -1950,14 +1950,14 @@ async function loadTasks() {
 }
 
 function getTaskBadgeClass(state: number) {
-  if (state === 2) return 'badge-success'
-  if (state === 3) return 'badge-danger'
+  if (state === 1) return 'badge-success'
+  if (state === -1) return 'badge-danger'
   return 'badge-processing'
 }
 
 function getTaskStatusLabel(state: number) {
-  if (state === 2) return tr('Complete')
-  if (state === 3) return tr('Failed')
+  if (state === 1) return tr('Complete')
+  if (state === -1) return tr('Failed')
   return tr('Processing')
 }
 
@@ -1972,7 +1972,7 @@ async function viewTaskLogs(task: any) {
       modalLogText.value += chunk
       
       const currentTask = tasks.value.find(t => t.task_id === task.task_id)
-      if (currentTask && (currentTask.state === 2 || currentTask.state === 3)) {
+      if (currentTask && (currentTask.state === 1 || currentTask.state === -1)) {
         break
       }
     }
