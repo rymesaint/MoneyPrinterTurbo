@@ -30,8 +30,42 @@ import sys
 import csv
 import time
 import argparse
+import signal
 from datetime import datetime, timezone
 from loguru import logger
+
+# Globals to track task state for signal handler
+sigint_received = False
+current_row = None
+current_csv_path = None
+current_tasks = None
+current_fieldnames = None
+
+def sigint_handler(signum, frame):
+    global sigint_received, current_row, current_csv_path, current_tasks, current_fieldnames
+    logger.warning("\n⚠️ SIGINT (Ctrl+C) received!")
+    
+    if sigint_received:
+        logger.error("🛑 Force exiting immediately on second Ctrl+C!")
+        sys.exit(1)
+        
+    # Check if upload is in progress in task.py
+    import app.services.task as tm
+    if getattr(tm, "upload_in_progress", False):
+        logger.warning("⏳ YouTube/Social upload is in progress. Deferring cancel until upload completes. Please wait... (Press Ctrl+C again to force exit)")
+        sigint_received = True
+        return
+        
+    # If not in upload stage, roll back task to pending immediately and exit
+    if current_row and current_csv_path and current_tasks and current_fieldnames:
+        logger.info(f"🔄 Rolling back task ID {current_row.get('id')} to 'pending'...")
+        current_row["status"] = "pending"
+        current_row["result"] = "Interrupted by user"
+        save_tasks(current_csv_path, current_tasks, current_fieldnames)
+        logger.success("Saved rollback state to CSV.")
+        
+    logger.info("Exiting program.")
+    sys.exit(1)
 
 # Ensure the project root is in the path for proper app imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -175,6 +209,14 @@ def execute_task(row, youtube_schedule=False):
     return ", ".join(output_info) if output_info else "Success"
 
 def run_schedule(csv_path, youtube_schedule=False):
+    global current_csv_path, current_tasks, current_fieldnames, current_row
+    current_csv_path = csv_path
+    try:
+        from app.services.youtube import process_pending_comments
+        process_pending_comments()
+    except Exception as e:
+        logger.error(f"Failed to process pending comments: {e}")
+
     if not os.path.exists(csv_path):
         example_path = "tasks_schedule.example.csv"
         if os.path.exists(example_path):
@@ -192,6 +234,8 @@ def run_schedule(csv_path, youtube_schedule=False):
 
     # Keep track of fieldnames to save correctly
     fieldnames = list(tasks[0].keys())
+    current_tasks = tasks
+    current_fieldnames = fieldnames
     
     updated = False
     for row in tasks:
@@ -232,6 +276,7 @@ def run_schedule(csv_path, youtube_schedule=False):
 
             # Mark running immediately & save to prevent race condition
             row["status"] = "running"
+            current_row = row
             save_tasks(csv_path, tasks, fieldnames)
             
             try:
@@ -248,11 +293,17 @@ def run_schedule(csv_path, youtube_schedule=False):
             
             updated = True
             save_tasks(csv_path, tasks, fieldnames)
+            current_row = None
+
+            if sigint_received:
+                logger.warning("👋 Exiting now as deferred SIGINT was pending.")
+                sys.exit(1)
 
     if not updated:
         logger.info("No pending tasks due for execution at this time.")
 
 def main():
+    signal.signal(signal.SIGINT, sigint_handler)
     parser = argparse.ArgumentParser(description="MoneyPrinterTurbo Excel/CSV Task Scheduler")
     parser.add_argument("--csv", default="tasks_schedule.csv", help="Path to schedule CSV file")
     parser.add_argument("--loop", action="store_true", help="Run in an infinite check loop")

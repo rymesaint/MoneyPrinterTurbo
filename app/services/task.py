@@ -12,6 +12,8 @@ from app.services import llm, material, subtitle, video, voice, upload_post
 from app.services import state as sm
 from app.utils import file_security, utils
 
+upload_in_progress = False
+
 
 def generate_script(task_id, params):
     logger.info("\n\n## generating video script")
@@ -324,6 +326,8 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
     try:
         return _start_inner(task_id, params, stop_at)
     finally:
+        global upload_in_progress
+        upload_in_progress = False
         logger.remove(handler_id)
 
 def _start_inner(task_id, params: VideoParams, stop_at: str = "video"):
@@ -453,6 +457,8 @@ def _start_inner(task_id, params: VideoParams, stop_at: str = "video"):
     )
 
     # 7. Cross-post to social platforms (if enabled)
+    global upload_in_progress
+    upload_in_progress = True
     cross_post_results = []
     if upload_post.upload_post_service.is_configured() and upload_post.upload_post_service.auto_upload:
         logger.info("\n\n## cross-posting videos to TikTok/Instagram")
@@ -577,6 +583,27 @@ def _start_inner(task_id, params: VideoParams, stop_at: str = "video"):
                 youtube_results.append(result)
                 if result.get('success'):
                     logger.info(f"✅ Uploaded to YouTube: {video_path}")
+                    # Auto-post engagement comment
+                    video_id = result.get("video_id")
+                    if video_id:
+                        _pinned_comments = [
+                            "Fakta mana yang paling bikin kamu kaget? Tulis di komentar! 🤔",
+                            "Sudah tahu fakta ini sebelumnya? Like kalau belum! 👍",
+                            "Tag temanmu yang harus tahu fakta ini! 🏷️",
+                            "Mau fakta unik lainnya? Subscribe dan nyalakan lonceng! 🔔",
+                            "Fakta ini beneran lho! Coba cek sendiri 😱 Tulis pendapatmu di bawah!",
+                        ]
+                        comment_text = _pinned_comments[idx % len(_pinned_comments)]
+                        if params.publish_at:
+                            # Scheduled video is private → can't comment yet, queue for later
+                            from app.services.youtube import queue_pending_comment
+                            queue_pending_comment(video_id, comment_text, params.publish_at)
+                            logger.info(f"📝 Comment queued for {video_id} (publish_at: {params.publish_at})")
+                        else:
+                            try:
+                                youtube_service.add_comment(video_id, comment_text)
+                            except Exception as ce:
+                                logger.warning(f"Failed to post comment on {video_id}: {ce}")
                 else:
                     logger.warning(f"⚠️ Failed to upload to YouTube: {video_path} - {result.get('error', 'Unknown error')}")
         except Exception as e:

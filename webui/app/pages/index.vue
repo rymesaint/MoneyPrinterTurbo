@@ -3001,6 +3001,8 @@ select.control { cursor: pointer; }
   color: var(--brand);
   font-weight: 500;
   pointer-events: auto;
+  position: relative;
+  z-index: 2;
 }
 
 .btn-remove-file {
@@ -3010,6 +3012,8 @@ select.control { cursor: pointer; }
   font-size: 16px;
   cursor: pointer;
   padding: 0 var(--sp-1);
+  position: relative;
+  z-index: 3;
 }
 
 .btn-remove-file:hover {

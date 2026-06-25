@@ -100,14 +100,14 @@ class VideoParams(BaseModel):
     subtitle_enabled: Optional[bool] = True
     subtitle_position: Optional[str] = config.ui.get("subtitle_position", "bottom")  # top, bottom, center, custom
     custom_position: float = config.ui.get("custom_position", 70.0)
-    font_name: Optional[str] = "STHeitiMedium.ttc"
-    text_fore_color: Optional[str] = "#FFFFFF"
-    text_background_color: Union[bool, str] = True
-    rounded_subtitle_background: bool = False
+    font_name: Optional[str] = config.ui.get("font_name", "STHeitiMedium.ttc")
+    text_fore_color: Optional[str] = config.ui.get("text_fore_color", "#FFFFFF")
+    text_background_color: Union[bool, str] = config.ui.get("subtitle_background_color", "#000000") if config.ui.get("subtitle_background_enabled", True) else False
+    rounded_subtitle_background: bool = config.ui.get("rounded_subtitle_background", False)
 
-    font_size: int = 60
-    stroke_color: Optional[str] = "#000000"
-    stroke_width: float = 1.5
+    font_size: int = config.ui.get("font_size", 60)
+    stroke_color: Optional[str] = config.ui.get("stroke_color", "#000000")
+    stroke_width: float = config.ui.get("stroke_width", 1.5)
     n_threads: Optional[int] = 2
     paragraph_number: int = Field(default=1, ge=1, le=10)
     video_script_prompt: str = Field(default="", max_length=2000)
@@ -124,13 +124,13 @@ class SubtitleRequest(BaseModel):
     bgm_file: Optional[str] = ""
     bgm_volume: Optional[float] = 0.2
     subtitle_position: Optional[str] = config.ui.get("subtitle_position", "bottom")
-    font_name: Optional[str] = "STHeitiMedium.ttc"
-    text_fore_color: Optional[str] = "#FFFFFF"
-    text_background_color: Union[bool, str] = True
-    rounded_subtitle_background: bool = False
-    font_size: int = 60
-    stroke_color: Optional[str] = "#000000"
-    stroke_width: float = 1.5
+    font_name: Optional[str] = config.ui.get("font_name", "STHeitiMedium.ttc")
+    text_fore_color: Optional[str] = config.ui.get("text_fore_color", "#FFFFFF")
+    text_background_color: Union[bool, str] = config.ui.get("subtitle_background_color", "#000000") if config.ui.get("subtitle_background_enabled", True) else False
+    rounded_subtitle_background: bool = config.ui.get("rounded_subtitle_background", False)
+    font_size: int = config.ui.get("font_size", 60)
+    stroke_color: Optional[str] = config.ui.get("stroke_color", "#000000")
+    stroke_width: float = config.ui.get("stroke_width", 1.5)
     video_source: Optional[str] = "local"
     subtitle_enabled: Optional[str] = "true"
 

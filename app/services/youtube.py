@@ -1,4 +1,6 @@
 import os
+import json
+from datetime import datetime, timezone
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
 from googleapiclient.discovery import build
@@ -13,6 +15,7 @@ class YouTubeService:
         self.scopes = [
             "https://www.googleapis.com/auth/youtube.upload",
             "https://www.googleapis.com/auth/youtube.readonly",
+            "https://www.googleapis.com/auth/youtube.force-ssl",
         ]
         self.credentials = None
 
@@ -200,6 +203,42 @@ class YouTubeService:
             return {"success": False, "error": f"YouTube API Error: {str(e)}"}
         except Exception as e:
             logger.error(f"Failed to upload video to YouTube: {e}")
+            return {"success": False, "error": str(e)}
+
+    def add_comment(
+        self,
+        video_id: str,
+        comment_text: str,
+    ) -> dict:
+        """Post a top-level comment on a video and return its id."""
+        if not self.is_configured():
+            return {"success": False, "error": "YouTube not configured"}
+        try:
+            youtube = self.get_authenticated_service()
+            if not youtube:
+                return {"success": False, "error": "Authentication failed"}
+
+            body = {
+                "snippet": {
+                    "videoId": video_id,
+                    "topLevelComment": {
+                        "snippet": {
+                            "textOriginal": comment_text,
+                        }
+                    },
+                }
+            }
+            res = youtube.commentThreads().insert(
+                part="snippet", body=body
+            ).execute()
+            comment_id = res.get("id")
+            logger.info(f"✅ Comment posted on video {video_id}: {comment_id}")
+            return {"success": True, "comment_id": comment_id}
+        except HttpError as e:
+            logger.error(f"YouTube comment API error: {e}")
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            logger.error(f"Failed to post comment: {e}")
             return {"success": False, "error": str(e)}
 
     def handle_api_error(self, e: Exception) -> dict:
@@ -401,3 +440,100 @@ class YouTubeService:
             return self.handle_api_error(e)
 
 youtube_service = YouTubeService()
+
+
+def queue_pending_comment(video_id: str, comment_text: str, publish_at: str):
+    """Save comment to queue to be posted when video becomes public."""
+    queue_file = os.path.join("storage", "pending_youtube_comments.json")
+    os.makedirs("storage", exist_ok=True)
+    
+    # Load existing queue
+    queue = []
+    if os.path.exists(queue_file):
+        try:
+            with open(queue_file, "r", encoding="utf-8") as f:
+                queue = json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to read pending comments: {e}")
+            
+    # Add new entry
+    queue.append({
+        "video_id": video_id,
+        "comment_text": comment_text,
+        "publish_at": publish_at,
+        "queued_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Save queue
+    try:
+        with open(queue_file, "w", encoding="utf-8") as f:
+            json.dump(queue, f, indent=4)
+        logger.info(f"Queued comment for scheduled video {video_id}")
+    except Exception as e:
+        logger.error(f"Failed to save pending comments queue: {e}")
+
+
+def process_pending_comments():
+    """Check all pending comments and post if the video is now public."""
+    queue_file = os.path.join("storage", "pending_youtube_comments.json")
+    if not os.path.exists(queue_file):
+        return
+        
+    try:
+        with open(queue_file, "r", encoding="utf-8") as f:
+            queue = json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to read pending comments: {e}")
+        return
+        
+    if not queue:
+        return
+        
+    logger.info(f"Checking {len(queue)} pending YouTube comments...")
+    
+    remaining = []
+    updated = False
+    
+    for item in queue:
+        video_id = item.get("video_id")
+        comment_text = item.get("comment_text")
+        
+        # Check video status via youtube_service
+        try:
+            status_res = youtube_service.get_video_stats(video_id)
+            if not status_res.get("success"):
+                err_msg = status_res.get("error", "")
+                if "not found" in err_msg.lower():
+                    logger.warning(f"Video {video_id} not found on YouTube. Removing from comment queue.")
+                    updated = True
+                    continue
+                remaining.append(item)
+                continue
+                
+            video_data = status_res.get("video", {})
+            privacy = video_data.get("privacyStatus")
+            upload_status = video_data.get("uploadStatus")
+            
+            # If the video is now public/unlisted and processed, post the comment
+            if privacy in ["public", "unlisted"] and upload_status == "processed":
+                logger.info(f"Video {video_id} is now {privacy}! Posting queued comment...")
+                post_res = youtube_service.add_comment(video_id, comment_text)
+                if post_res.get("success"):
+                    updated = True
+                    continue
+                else:
+                    logger.warning(f"Failed to post queued comment for {video_id}: {post_res.get('error')}")
+                    remaining.append(item)
+            else:
+                remaining.append(item)
+        except Exception as e:
+            logger.error(f"Error checking status for video {video_id}: {e}")
+            remaining.append(item)
+            
+    if updated:
+        try:
+            with open(queue_file, "w", encoding="utf-8") as f:
+                json.dump(remaining, f, indent=4)
+        except Exception as e:
+            logger.error(f"Failed to update pending comments queue: {e}")
+
