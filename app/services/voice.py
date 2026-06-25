@@ -393,12 +393,11 @@ def tts(
     if used_fallback and sub_maker is None:
         # Trigger fallback to azure_tts_v1
         gender = "Male" if "Male" in voice_name else "Female"
-        is_zh = bool(re.search(r"[\u4e00-\u9fff]", text))
         
         if gender == "Male":
-            fallback_voice = "zh-CN-YunxiNeural" if is_zh else "en-US-GuyNeural"
+            fallback_voice = "id-ID-ArdiNeural"
         else:
-            fallback_voice = "zh-CN-XiaoyiNeural" if is_zh else "en-US-JennyNeural"
+            fallback_voice = "id-ID-GadisNeural"
             
         logger.warning(
             f"TTS engine failed or is out of quota/limit. Falling back to Azure TTS V1: {fallback_voice}"
@@ -1193,33 +1192,27 @@ def get_elevenlabs_voices() -> list[str]:
     """
     api_key = config.elevenlabs.get("api_key", "")
     
-    # 默认 fallback 预置语音列表
     fallback_voices = [
-        ("Rachel", "21m00Tcm4TlvDq8ikWAM", "Female"),
-        ("Drew", "29vD33N1CtxCmqQRPOHJ", "Male"),
-        ("Clyde", "2EiwWnXF2V4jnm76Cnsl", "Male"),
-        ("Paul", "5Q0t7uMcjTElIk8kvbEn", "Male"),
         ("Sarah", "EXAVITQu4vr4xnSDxMaL", "Female"),
-        ("Antoni", "ErXwobaYiN019PkySvjV", "Male"),
-        ("Thomas", "GBv7mTt0atIp3u8bJ6hc", "Male"),
-        ("George", "JBF2z4NPnc783YqJex5T", "Male"),
-        ("Emily", "LcfcDJNUP1GQjkzn1xUU", "Female"),
-        ("Ellie", "MF3mGyEYCl7XYWbV9VbO", "Female"),
-        ("Callum", "N2lVS1w4vnEZ4a9abIfz", "Male"),
-        ("Harry", "SOY5ztCD19z051286c0c", "Male"),
+        ("Laura", "FGY2WhTYpPnrIDTdsKH5", "Female"),
+        ("Charlie", "IKne3meq5aSn9XLyUdCD", "Male"),
+        ("George", "JBFqnCBsd6RMkjVDRZzb", "Male"),
+        ("Callum", "N2lVS1w4EtoT3dr4eOWO", "Male"),
+        ("River", "SAz9YHcvj6GT2YYXdXww", "Neutral"),
+        ("Harry", "SOYHLrjzK2X1ezoPC6cr", "Male"),
         ("Liam", "TX38egHYaUdthpC5h3Sb", "Male"),
-        ("Josh", "TxGEqn7nUaNZBsjuxIMc", "Male"),
-        ("Arnold", "VR6A4UBqghEL2iDuR0Mt", "Male"),
-        ("Charlotte", "XB0fDUnexUJaZyXYnN13", "Female"),
-        ("Alice", "Xb7hHhhmWlz76LBo7z27", "Female"),
-        ("Matilda", "XrExE9yKIg1WjnnlQA8q", "Female"),
-        ("Matthew", "Yko785vE7XMpaCg7s38r", "Male"),
-        ("James", "ZQe5851lT3k1S1B28c0c", "Male"),
-        ("Adam", "pNInz6obpgDQ5dcoflfY", "Male"),
-        ("Nicole", "piTKgcLEGmPEe14kJJD5", "Female"),
-        ("Jessie", "rGb2z4NPnc783YqJex5T", "Female"),
-        ("Ryan", "wVi2z7va87zw2vZqF4c", "Male"),
-        ("Sam", "yoZ06aFlgZ3P3Swi3F98", "Male"),
+        ("Alice", "Xb7hH8MSUJpSbSDYk0k2", "Female"),
+        ("Matilda", "XrExE9yKIg1WjnnlVkGX", "Female"),
+        ("Will", "bIHbv24MWmeRgasZH58o", "Male"),
+        ("Jessica", "cgSgspJ2msm6clMCkdW9", "Female"),
+        ("Eric", "cjVigY5qzO86Huf0OWal", "Male"),
+        ("Bella", "hpp4J3VqNfWAUOO0d1Us", "Female"),
+        ("Chris", "iP95p4xoKVk53GoZ742B", "Male"),
+        ("Brian", "nPczCjzI2devNBz1zQrb", "Male"),
+        ("Daniel", "onwK4e9ZLuTAKqWW03F9", "Male"),
+        ("Lily", "pFZP5JQG7iQjIQuC4Bku", "Female"),
+        ("Adam", "pNInz6obpgDQGcFmaJgB", "Male"),
+        ("Bill", "pqHfZKP75CvOlQylNhV4", "Male"),
     ]
 
     if not api_key:
