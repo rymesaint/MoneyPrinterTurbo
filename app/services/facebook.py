@@ -17,13 +17,14 @@ class FacebookService:
         access_token = config.facebook.get("access_token", "")
         return bool(enabled and page_id and access_token)
 
-    def upload_reel(self, video_path: str, caption: str) -> dict:
+    def upload_reel(self, video_path: str, caption: str, publish_at: str = None) -> dict:
         """
         Uploads and publishes a video as a Facebook Reel.
         
         Args:
             video_path: Local path to the MP4 file
             caption: Reel description/caption
+            publish_at: ISO 8601 string for scheduled publication
 
         Returns:
             dict: Operation status containing success state and video_id/error details.
@@ -89,13 +90,31 @@ class FacebookService:
                 "video_state": "PUBLISHED",
                 "description": caption
             }
+
+            if publish_at:
+                try:
+                    from datetime import datetime
+                    clean_str = publish_at
+                    if clean_str.endswith("Z"):
+                        clean_str = clean_str[:-1] + "+00:00"
+                    dt = datetime.fromisoformat(clean_str)
+                    timestamp = int(dt.timestamp())
+                    finish_params["video_state"] = "SCHEDULED"
+                    finish_params["scheduled_publish_time"] = timestamp
+                    logger.info(f"Scheduling Facebook Reel for: {publish_at} (Timestamp: {timestamp})")
+                except Exception as ex:
+                    logger.warning(f"Failed to parse publish_at '{publish_at}' for Facebook scheduling: {ex}")
+
             finish_res = requests.post(finish_url, params=finish_params, timeout=30)
             finish_res.raise_for_status()
             finish_data = finish_res.json()
 
             if finish_data.get("success") or "id" in finish_data:
                 published_id = finish_data.get("id", video_id)
-                logger.info(f"✅ Facebook Reel published successfully! Page ID: {page_id}, Video ID: {published_id}")
+                if finish_params.get("video_state") == "SCHEDULED":
+                    logger.info(f"✅ Facebook Reel scheduled successfully! Page ID: {page_id}, Video ID: {published_id}")
+                else:
+                    logger.info(f"✅ Facebook Reel published successfully! Page ID: {page_id}, Video ID: {published_id}")
                 return {"success": True, "video_id": published_id}
             else:
                 logger.warning(f"Facebook Reels publish returned unexpected response: {finish_data}")

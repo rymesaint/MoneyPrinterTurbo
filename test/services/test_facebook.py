@@ -71,6 +71,30 @@ class TestFacebookReelsUpload(unittest.TestCase):
         self.assertEqual(third_call_kwargs["params"]["video_state"], "PUBLISHED")
         self.assertEqual(third_call_kwargs["params"]["description"], "Check out OtakKepo! #viral")
 
+    @patch("app.services.facebook.config.facebook", _CONFIG_BASE)
+    @patch("app.services.facebook.os.path.exists", return_value=True)
+    @patch("app.services.facebook.os.path.getsize", return_value=12345)
+    @patch("builtins.open", mock_open(read_data=b"fake_video_bytes"))
+    @patch("app.services.facebook.requests.post")
+    def test_upload_reel_scheduled_success(self, mock_post, _getsize, _exists):
+        mock_post.side_effect = [
+            _mock_json_response({"video_id": "fb_video_789", "upload_url": "https://rupload.fb.com/upload"}),
+            _mock_json_response({"success": True}),
+            _mock_json_response({"success": True, "id": "reel_published_999"})
+        ]
+
+        svc = FacebookService()
+        result = svc.upload_reel("/fake/path.mp4", "Check out OtakKepo! #viral", publish_at="2026-06-25T12:00:00Z")
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["video_id"], "reel_published_999")
+        self.assertEqual(mock_post.call_count, 3)
+
+        # Verify Finish Call arguments for scheduling
+        third_call_args, third_call_kwargs = mock_post.call_args_list[2]
+        self.assertEqual(third_call_kwargs["params"]["video_state"], "SCHEDULED")
+        self.assertEqual(third_call_kwargs["params"]["scheduled_publish_time"], 1782388800)
+
     @patch("app.services.facebook.config.facebook", {**_CONFIG_BASE, "enabled": False})
     def test_upload_reel_not_enabled(self):
         svc = FacebookService()

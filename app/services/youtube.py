@@ -10,7 +10,10 @@ from app.config import config
 class YouTubeService:
     def __init__(self):
         # Read parameters on initial load
-        self.scopes = ["https://www.googleapis.com/auth/youtube.upload"]
+        self.scopes = [
+            "https://www.googleapis.com/auth/youtube.upload",
+            "https://www.googleapis.com/auth/youtube.readonly",
+        ]
         self.credentials = None
 
     def is_configured(self) -> bool:
@@ -38,13 +41,26 @@ class YouTubeService:
         if not self.credentials:
             self.load_credentials()
 
-        if self.credentials and self.credentials.expired and self.credentials.refresh_token:
+        # Force refresh if scopes in json don't match self.scopes
+        needs_refresh = False
+        if os.path.exists(credentials_file):
+            try:
+                import json
+                with open(credentials_file, "r") as f:
+                    data = json.load(f)
+                file_scopes = data.get("scopes", [])
+                if any(s not in file_scopes for s in self.scopes):
+                    needs_refresh = True
+            except Exception:
+                pass
+
+        if self.credentials and (self.credentials.expired or needs_refresh) and self.credentials.refresh_token:
             try:
                 from google.auth.transport.requests import Request
                 self.credentials.refresh(Request())
                 with open(credentials_file, "w") as f:
                     f.write(self.credentials.to_json())
-                logger.info("Refreshed expired YouTube credentials.")
+                logger.info("Refreshed YouTube credentials (expired or updated scopes).")
             except Exception as e:
                 logger.error(f"Failed to refresh YouTube credentials: {e}")
                 self.credentials = None

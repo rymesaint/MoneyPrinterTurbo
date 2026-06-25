@@ -617,7 +617,8 @@ def _start_inner(task_id, params: VideoParams, stop_at: str = "video"):
             for video_path in final_video_paths:
                 result = facebook_service.upload_reel(
                     video_path=video_path,
-                    caption=fb_desc
+                    caption=fb_desc,
+                    publish_at=getattr(params, "publish_at", None)
                 )
                 facebook_results.append(result)
                 if result.get('success'):
