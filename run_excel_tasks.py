@@ -237,10 +237,18 @@ def run_schedule(csv_path, youtube_schedule=False):
     current_tasks = tasks
     current_fieldnames = fieldnames
     
-    updated = False
+    # Filter candidate tasks that are either 'pending' or 'failed'
+    candidates = []
     for row in tasks:
-        if row.get("status", "").strip().lower() != "pending":
-            continue
+        status = row.get("status", "").strip().lower()
+        if status in ("pending", "failed"):
+            candidates.append(row)
+
+    # Prioritize 'failed' tasks first, keeping original order for same status (stable sort)
+    candidates.sort(key=lambda r: 0 if r.get("status", "").strip().lower() == "failed" else 1)
+
+    updated = False
+    for row in candidates:
             
         schedule_time_str = row.get("schedule_time", "").strip()
         should_run = False
